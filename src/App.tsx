@@ -4,6 +4,7 @@ import { useStore } from './store/useStore'
 import { Loader2 } from 'lucide-react'
 import { AppLayout } from './components/layout/AppLayout'
 import { LoginPage } from './pages/LoginPage'
+import { SignUpPage } from './pages/SignUpPage'
 import { useAuthStore } from './store/useAuthStore'
 import DashboardPage from './pages/DashboardPage'
 import EventsPage from './pages/EventsPage'
@@ -37,12 +38,25 @@ export default function App() {
       useAuthStore.getState().logout()
       useStore.getState().resetApp()
     }
+    const handleWorkspaceSwitched = () => {
+      useStore.getState().resetApp()
+      initApp()
+    }
     window.addEventListener('auth-unauthorized', handleUnauthorized)
-    return () => window.removeEventListener('auth-unauthorized', handleUnauthorized)
-  }, [])
+    window.addEventListener('workspace-switched', handleWorkspaceSwitched)
+    return () => {
+      window.removeEventListener('auth-unauthorized', handleUnauthorized)
+      window.removeEventListener('workspace-switched', handleWorkspaceSwitched)
+    }
+  }, [initApp])
 
   if (!token) {
-    return <LoginPage />
+    return (
+      <Routes>
+        <Route path="/register" element={<SignUpPage />} />
+        <Route path="*" element={<LoginPage />} />
+      </Routes>
+    )
   }
 
   const appError = useStore((s) => s.appError)

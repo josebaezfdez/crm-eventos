@@ -133,6 +133,48 @@ export default function SettingsPage() {
           </Button>
         </div>
       </form>
+
+      {/* Miembros del Workspace (UI inicial) */}
+      <Card className="mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <CardTitle>Miembros del Equipo</CardTitle>
+            <CardSubtitle>Usuarios con acceso a este workspace.</CardSubtitle>
+          </div>
+          <Button variant="secondary" onClick={() => alert('Sistema de invitaciones en desarrollo')}>
+            + Invitar Miembro
+          </Button>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="text-xs text-slate-500 uppercase bg-slate-50">
+              <tr>
+                <th className="px-4 py-3 font-medium">Nombre</th>
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Rol</th>
+                <th className="px-4 py-3 font-medium text-right">Estado</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              <tr>
+                <td className="px-4 py-3 font-medium text-slate-900">{useAuthStore.getState().user?.name || 'Tú'}</td>
+                <td className="px-4 py-3 text-slate-500">{useAuthStore.getState().user?.email || ''}</td>
+                <td className="px-4 py-3">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-brand-100 text-brand-700">
+                    ADMIN
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
+                    Activo
+                  </span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   )
 }

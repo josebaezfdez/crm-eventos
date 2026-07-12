@@ -32,7 +32,7 @@ export function LoginPage() {
       }
 
       const data = await res.json()
-      login(data.token, data.user)
+      login(data.token, data.user, data.memberships)
     } catch (err: any) {
       setError(err.message)
     } finally {
@@ -93,6 +93,10 @@ export function LoginPage() {
           <Button type="submit" className="w-full h-11" disabled={loading}>
             {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : 'Entrar'}
           </Button>
+
+          <p className="text-center text-sm text-zinc-500 mt-4">
+            ¿No tienes cuenta? <a href="/register" className="text-brand-600 font-medium hover:underline">Regístrate</a>
+          </p>
         </form>
       </Card>
     </div>

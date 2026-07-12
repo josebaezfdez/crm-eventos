@@ -81,4 +81,35 @@ describe('Multi-tenant Isolation & Soft Delete', () => {
     const bClients = await db.select().from(schema.clients).where(eq(schema.clients.id, 'client_B1')) as any[];
     expect(bClients.length).toBe(1);
   });
+
+  it('Empresa A no puede crear un evento usando el cliente de Empresa B', async () => {
+    const req = new Request('http://localhost/api/events', {
+      method: 'POST',
+      headers: { 
+        Authorization: `Bearer ${tokenA}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        id: 'event_A1',
+        clientId: 'client_B1', // Este cliente es de B
+        name: 'Hacked Event',
+        date: '2026-10-10',
+        location: 'Madrid',
+        type: 'Empresa',
+        attendees: 100,
+        durationHours: 4,
+        status: 'draft',
+        notes: ''
+      })
+    });
+    const res = await app.request(req, {}, env);
+    expect(res.status).toBe(400);
+
+    const data = await res.json() as any;
+    expect(data.error).toBe('Cliente no encontrado o no pertenece a la empresa actual.');
+
+    // Verificar que no se creó
+    const aEvents = await db.select().from(schema.events).where(eq(schema.events.id, 'event_A1')) as any[];
+    expect(aEvents.length).toBe(0);
+  });
 });

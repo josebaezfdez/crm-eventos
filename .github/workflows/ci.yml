@@ -39,6 +39,10 @@ jobs:
       working-directory: ./backend
       run: npm run typecheck
 
+    - name: Apply Local D1 Migrations
+      working-directory: ./backend
+      run: npm run db:migrate:local
+
     - name: Test Backend
       working-directory: ./backend
       run: npm run test

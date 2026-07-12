@@ -16,11 +16,22 @@ export const companies = sqliteTable('companies', {
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
-  companyId: text('company_id').notNull(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
   passwordSalt: text('password_salt').notNull(),
   name: text('name').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const companyMemberships = sqliteTable('company_memberships', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  companyId: text('company_id').notNull(),
+  role: text('role').notNull(), // 'ADMIN' | 'MEMBER'
+  status: text('status').notNull(), // 'ACTIVE' | 'PENDING'
+  invitedBy: text('invited_by'),
+  invitedAt: text('invited_at'),
+  acceptedAt: text('accepted_at'),
   createdAt: text('created_at').notNull(),
 });
 

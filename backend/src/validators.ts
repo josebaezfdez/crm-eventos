@@ -14,6 +14,13 @@ export const loginSchema = z.object({
   password: z.string().min(1)
 }).strict();
 
+export const registerSchema = z.object({
+  name: z.string().min(1),
+  email: z.string().email(),
+  password: z.string().min(6),
+  companyName: z.string().min(1)
+}).strict();
+
 export const companySchema = z.object({
   id: z.string(),
   name: z.string().min(1),
