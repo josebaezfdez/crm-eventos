@@ -24,6 +24,7 @@ import PackagesPage from './pages/PackagesPage'
 export default function App() {
   const isInitialized = useStore((s) => s.isInitialized)
   const initApp = useStore((s) => s.initApp)
+  const appError = useStore((s) => s.appError)
 
   const token = useAuthStore((s) => s.token)
 
@@ -58,8 +59,6 @@ export default function App() {
       </Routes>
     )
   }
-
-  const appError = useStore((s) => s.appError)
 
   if (!isInitialized) {
     return (
