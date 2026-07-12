@@ -1,1 +1,1 @@
-ALTER TABLE `users` ADD `password_salt` text NOT NULL;
+ALTER TABLE `users` ADD `password_salt` text NOT NULL DEFAULT '';
