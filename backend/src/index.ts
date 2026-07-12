@@ -19,7 +19,9 @@ type Variables = {
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>()
 
-app.use('/api/*', cors())
+app.use('/api/*', cors({
+  origin: ['https://crm-eventos.pages.dev', 'http://localhost:5173']
+}))
 
 async function hashPassword(password: string, providedSalt?: string): Promise<{ hash: string, salt: string }> {
   const enc = new TextEncoder();
@@ -58,7 +60,10 @@ async function hashPassword(password: string, providedSalt?: string): Promise<{ 
 }
 
 app.post('/api/auth/login', async (c) => {
-  const { email, password } = await c.req.json()
+  const body = await c.req.json()
+  const parsed = validators.loginSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const { email, password } = parsed.data
   const db = drizzle(c.env.DB)
   const users = await db.select().from(schema.users).where(eq(schema.users.email, email))
   
@@ -155,7 +160,7 @@ app.put('/api/clients/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  const parsed = validators.clientSchema.safeParse(body)
+  const parsed = validators.clientUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   await db.update(schema.clients).set(parsed.data).where(and(eq(schema.clients.id, id), eq(schema.clients.companyId, companyId)))
   return c.json({ success: true })
@@ -184,7 +189,7 @@ app.put('/api/partners/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  const parsed = validators.partnerSchema.safeParse(body)
+  const parsed = validators.partnerUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   await db.update(schema.partners).set(parsed.data).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
   return c.json({ success: true })
@@ -213,7 +218,7 @@ app.put('/api/packages/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  const parsed = validators.packageSchema.safeParse(body)
+  const parsed = validators.packageUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   await db.update(schema.packages).set(parsed.data).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
   return c.json({ success: true })
@@ -242,7 +247,7 @@ app.put('/api/events/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  const parsed = validators.eventSchema.safeParse(body)
+  const parsed = validators.eventUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   await db.update(schema.events).set(parsed.data).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
   return c.json({ success: true })
@@ -271,7 +276,7 @@ app.put('/api/budgets/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  const parsed = validators.budgetSchema.safeParse(body)
+  const parsed = validators.budgetUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   await db.update(schema.budgets).set(parsed.data).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
   return c.json({ success: true })
@@ -300,7 +305,7 @@ app.put('/api/payments/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  const parsed = validators.paymentSchema.safeParse(body)
+  const parsed = validators.paymentUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   await db.update(schema.payments).set(parsed.data).where(and(eq(schema.payments.id, id), eq(schema.payments.companyId, companyId)))
   return c.json({ success: true })
@@ -345,16 +350,10 @@ app.put('/api/settings', async (c) => {
   const jwtPayload = c.get('jwtPayload')
   const companyId = jwtPayload.companyId
   const body = await c.req.json()
-  await db.update(schema.companies).set({
-    name: body.name,
-    taxId: body.taxId,
-    address: body.address,
-    email: body.email,
-    phone: body.phone,
-    website: body.website,
-    lightLogoUrl: body.lightLogoUrl,
-    darkLogoUrl: body.darkLogoUrl
-  }).where(eq(schema.companies.id, companyId))
+  const parsed = validators.companyUpdateSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  
+  await db.update(schema.companies).set(parsed.data).where(eq(schema.companies.id, companyId))
   return c.json({ success: true })
 })
 
@@ -364,6 +363,10 @@ app.post('/api/upload', async (c) => {
     const formData = await c.req.formData()
     const file = formData.get('file') as unknown as File
     if (!file) return c.json({ error: 'No file provided' }, 400)
+    
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+    if (!allowedMimeTypes.includes(file.type)) return c.json({ error: 'Formato no permitido' }, 400)
+    if (file.size > 2 * 1024 * 1024) return c.json({ error: 'El archivo excede 2MB' }, 400)
     
     // Generate simple unique ID
     const ext = file.name.split('.').pop() || 'png'

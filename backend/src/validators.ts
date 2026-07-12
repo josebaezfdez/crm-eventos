@@ -1,5 +1,23 @@
 import { z } from 'zod';
 
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1)
+});
+
+export const companySchema = z.object({
+  id: z.string(),
+  name: z.string().min(1),
+  fiscalName: z.string().optional(),
+  nif: z.string().optional(),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+  email: z.string().email().optional().or(z.literal('')),
+  website: z.string().optional(),
+  lightLogoUrl: z.string().optional(),
+  darkLogoUrl: z.string().optional()
+});
+
 export const clientSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
@@ -85,3 +103,24 @@ export const postEventResultSchema = z.object({
   realTotalCost: z.number(),
   notes: z.string().optional()
 });
+
+// Update schemas (Partial, strict, and requiring at least one field)
+const createUpdateSchema = (schema: z.ZodObject<any, any>) => 
+  schema.omit({ id: true })
+    .partial()
+    .strict()
+    .refine(data => Object.keys(data).length > 0, "Al menos un campo debe ser modificado");
+
+export const companyUpdateSchema = createUpdateSchema(companySchema);
+export const clientUpdateSchema = createUpdateSchema(clientSchema);
+export const partnerUpdateSchema = createUpdateSchema(partnerSchema);
+export const packageUpdateSchema = createUpdateSchema(packageSchema);
+export const eventUpdateSchema = createUpdateSchema(eventSchema);
+export const budgetUpdateSchema = createUpdateSchema(budgetSchema);
+export const paymentUpdateSchema = createUpdateSchema(paymentSchema);
+export const postEventResultUpdateSchema = postEventResultSchema
+  .omit({ eventId: true })
+  .partial()
+  .strict()
+  .refine(data => Object.keys(data).length > 0, "Al menos un campo debe ser modificado");
+

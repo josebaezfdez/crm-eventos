@@ -18,15 +18,7 @@ import type {
   PostEventResult,
   RealCostLine,
 } from '../types'
-import {
-  mockBudgets,
-  mockClients,
-  mockEvents,
-  mockPackages,
-  mockPartners,
-  mockPayments,
-  mockPostEventResults,
-} from '../data/mockData'
+
 import { buildBudgetSummary, recalcBudget } from '../utils/marginCalculator'
 import { uid } from '../utils/format'
 import { useAuthStore } from './useAuthStore'
@@ -81,11 +73,11 @@ interface AppState {
 
   // Sistema
   initApp: () => Promise<void>
-  resetDemo: () => Promise<void>
-  reseed: () => Promise<void>
+  updateSettings: (patch: Partial<Company>) => Promise<void>
 }
 
-const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
+import { API_BASE_URL } from '../config'
+const BASE_URL = API_BASE_URL
 
 const getHeaders = () => {
   const token = useAuthStore.getState().token
@@ -95,14 +87,38 @@ const getHeaders = () => {
   }
 }
 
+const handleResponse = async (res: Response) => {
+  if (res.status === 401) {
+    useAuthStore.getState().logout()
+    throw new Error('Sesión caducada o no autorizada. Por favor, inicia sesión de nuevo.')
+  }
+  if (!res.ok) {
+    let errMsg = 'Error en la petición'
+    try {
+      const errData = await res.json()
+      errMsg = errData.error || errData.message || errMsg
+    } catch (e) {
+      // Ignorar
+    }
+    throw new Error(errMsg)
+  }
+  
+  // Para 204 No Content o si no hay body, devolver true
+  const contentType = res.headers.get('content-type')
+  if (contentType && contentType.includes('application/json')) {
+    return res.json()
+  }
+  return { success: true }
+}
+
 const api = {
-  get: (url: string) => fetch(BASE_URL + url, { headers: getHeaders() }).then(res => res.json()),
-  post: (url: string, data: any) => fetch(BASE_URL + url, { method: 'POST', headers: getHeaders(), body: JSON.stringify(data) }).then(res => res.json()),
-  put: (url: string, data: any) => fetch(BASE_URL + url, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(data) }),
+  get: (url: string) => fetch(BASE_URL + url, { headers: getHeaders() }).then(handleResponse),
+  post: (url: string, data: any) => fetch(BASE_URL + url, { method: 'POST', headers: getHeaders(), body: JSON.stringify(data) }).then(handleResponse),
+  put: (url: string, data: any) => fetch(BASE_URL + url, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(data) }).then(handleResponse),
   delete: (url: string) => fetch(BASE_URL + url, { 
     method: 'DELETE', 
     headers: useAuthStore.getState().token ? { 'Authorization': `Bearer ${useAuthStore.getState().token}` } : {} 
-  }),
+  }).then(handleResponse),
 }
 
 export const useStore = create<AppState>((set, get) => ({
@@ -278,26 +294,11 @@ export const useStore = create<AppState>((set, get) => ({
       set({ isInitialized: true })
     }
   },
-  resetDemo: async () => {
-    // Mandamos los datos de prueba al backend
-    await fetch(BASE_URL + '/api/seed', {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({
-        clients: mockClients,
-        partners: mockPartners,
-        packages: mockPackages,
-        events: mockEvents,
-        budgets: mockBudgets,
-        payments: mockPayments,
-        postEventResults: mockPostEventResults,
-      })
-    })
-    await get().initApp()
-  },
-  reseed: async () => {
-    await get().resetDemo()
-  },
+  updateSettings: async (patch) => {
+    await api.put('/api/settings', patch)
+    const current = get().settings || {} as Company
+    set({ settings: { ...current, ...patch } })
+  }
 }))
 
 export { buildBudgetSummary }

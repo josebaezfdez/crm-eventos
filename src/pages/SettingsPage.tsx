@@ -9,8 +9,10 @@ import { useAuthStore } from '../store/useAuthStore'
 import { ImageUpload } from '../components/ui/ImageUpload'
 import PartnersPage from './PartnersPage'
 import PackagesPage from './PackagesPage'
+import { API_BASE_URL } from '../config'
+import { useStore } from '../store/useStore'
 
-const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
+const BASE_URL = API_BASE_URL
 
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -100,22 +102,18 @@ function ProfileTab() {
       })
       .catch(() => setLoading(false))
   }, [token])
+  const updateSettings = useStore((s: any) => s.updateSettings)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setSuccess(false)
     try {
-      await fetch(BASE_URL + '/api/settings', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}` 
-        },
-        body: JSON.stringify(formData)
-      })
+      await updateSettings(formData)
       setSuccess(true)
       setTimeout(() => setSuccess(false), 3000)
+    } catch (err) {
+      console.error(err)
     } finally {
       setSaving(false)
     }

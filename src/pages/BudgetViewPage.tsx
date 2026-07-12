@@ -9,6 +9,7 @@ import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { useBudget, useClient, useEvent } from '../hooks/useSelectors'
 import { useStore as useAppStore } from '../store/useStore'
 import { formatCurrency, formatDate, formatDateLong } from '../utils/format'
+import { getImageUrl } from '../utils/images'
 import { ArrowLeft, FileDown, Send, Receipt, Eye, ShieldCheck, Edit3, Trash2 } from 'lucide-react'
 
 const DEFAULT_BUSINESS = {
@@ -90,8 +91,8 @@ export default function BudgetViewPage() {
           <div>
             <div className="flex items-center gap-2.5">
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-accent-500 text-white shadow-glow overflow-hidden">
-                {settings?.logoUrl ? (
-                  <img src={settings.logoUrl} alt={business.name} className="w-full h-full object-cover" />
+                {settings?.darkLogoUrl || settings?.lightLogoUrl ? (
+                  <img src={getImageUrl(settings.darkLogoUrl || settings.lightLogoUrl)} alt={business.name} className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-base font-bold">{business.name.charAt(0).toUpperCase()}</span>
                 )}

@@ -67,7 +67,8 @@ export interface Company {
   email?: string
   phone?: string
   website?: string
-  logoUrl?: string
+  lightLogoUrl?: string
+  darkLogoUrl?: string
   createdAt: string
 }
 

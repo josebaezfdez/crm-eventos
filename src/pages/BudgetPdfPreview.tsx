@@ -8,6 +8,8 @@ import { TemplateClassic } from '../components/budgets/templates/TemplateClassic
 import { TemplateModern } from '../components/budgets/templates/TemplateModern'
 import { TemplateBold } from '../components/budgets/templates/TemplateBold'
 
+import { getImageUrl } from '../utils/images'
+
 const DEFAULT_BUSINESS = {
   name: 'EventMargin',
   tagline: 'SaaS de Presupuestación',
@@ -30,7 +32,7 @@ export default function BudgetPdfPreview() {
     tagline: settings?.email ? '' : DEFAULT_BUSINESS.tagline,
     email: settings?.email || DEFAULT_BUSINESS.email,
     phone: settings?.phone || DEFAULT_BUSINESS.phone,
-    logoUrl: settings?.logoUrl,
+    logoUrl: getImageUrl(settings?.darkLogoUrl || settings?.lightLogoUrl || ''),
   }
 
   const [template, setTemplate] = useState<TemplateType>('classic')

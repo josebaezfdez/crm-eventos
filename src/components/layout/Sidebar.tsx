@@ -1,4 +1,3 @@
-import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -7,7 +6,8 @@ import {
   Receipt,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
-import { useAuthStore } from '../../store/useAuthStore'
+import { useStore } from '../../store/useStore'
+import { getImageUrl } from '../../utils/images'
 
 interface NavItem {
   to: string
@@ -24,23 +24,10 @@ const navItems: NavItem[] = [
 ]
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
-  const token = useAuthStore(s => s.token)
-  const [logoUrl, setLogoUrl] = useState('')
-  const [companyName, setCompanyName] = useState('EventMargin')
-
-  useEffect(() => {
-    if (!token) return
-    const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
-    fetch(BASE_URL + '/api/settings', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(res => res.json())
-      .then(data => {
-        if (data.lightLogoUrl) setLogoUrl(data.lightLogoUrl)
-        if (data.name) setCompanyName(data.name)
-      })
-      .catch(() => {})
-  }, [token])
+  const settings = useStore(s => s.settings)
+  
+  const logoUrl = getImageUrl(settings?.lightLogoUrl || '')
+  const companyName = settings?.name || 'EventMargin'
 
   return (
     <div className="flex h-full flex-col bg-slate-900 text-slate-300">

@@ -14,10 +14,15 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
   const addClient = useStore((s) => s.addClient)
   const addEvent = useStore((s) => s.addEvent)
 
+  const [existingClientId, setExistingClientId] = useState('')
   const [clientName, setClientName] = useState('')
   const [clientEmail, setClientEmail] = useState('')
+  
   const [eventName, setEventName] = useState('')
   const [eventDate, setEventDate] = useState('')
+  const [eventType, setEventType] = useState('Boda')
+  const [eventAttendees, setEventAttendees] = useState(50)
+  const [eventDuration, setEventDuration] = useState(3)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   // Filter events that don't have an accepted budget, or just show recent ones
@@ -29,24 +34,32 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
 
     setIsSubmitting(true)
     try {
-      // 1. Crear cliente
-      const client = await addClient({
-        name: clientName,
-        email: clientEmail,
-        phone: '',
-        company: '',
-        notes: 'Creado desde presupuesto rápido',
-      })
+      // 1. Reutilizar o crear cliente
+      let client = clients.find(c => c.id === existingClientId)
+      
+      if (!client && clientEmail) {
+        client = clients.find(c => c.email.toLowerCase() === clientEmail.trim().toLowerCase())
+      }
+      
+      if (!client) {
+        client = await addClient({
+          name: clientName,
+          email: clientEmail.trim(),
+          phone: '',
+          company: '',
+          notes: 'Creado desde presupuesto rápido',
+        })
+      }
 
       // 2. Crear evento
       const event = await addEvent({
-        clientId: client.id,
+        clientId: client!.id,
         name: eventName,
         date: eventDate,
         location: '',
-        type: 'Otro',
-        attendees: 50,
-        durationHours: 3,
+        type: eventType as any,
+        attendees: eventAttendees,
+        durationHours: eventDuration,
         status: 'draft',
         acceptedBudgetId: null,
         notes: '',
@@ -79,6 +92,32 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
 
             <form onSubmit={handleQuickStart} className="space-y-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                <div className="col-span-full space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Seleccionar cliente existente</label>
+                  <select
+                    value={existingClientId}
+                    onChange={(e) => {
+                      setExistingClientId(e.target.value)
+                      if (e.target.value) {
+                        const c = clients.find(cli => cli.id === e.target.value)
+                        if (c) {
+                          setClientName(c.name)
+                          setClientEmail(c.email || '')
+                        }
+                      } else {
+                        setClientName('')
+                        setClientEmail('')
+                      }
+                    }}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+                  >
+                    <option value="">-- Nuevo Cliente --</option>
+                    {clients.map(c => (
+                      <option key={c.id} value={c.id}>{c.name} {c.email ? `(${c.email})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+                
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                     <User size={14} className="text-brand-500" />
@@ -86,20 +125,22 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
                   </label>
                   <input
                     required
+                    disabled={!!existingClientId}
                     value={clientName}
                     onChange={(e) => setClientName(e.target.value)}
                     placeholder="Ej. María o Empresa S.A."
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-semibold text-slate-700">Email (opcional)</label>
                   <input
                     type="email"
+                    disabled={!!existingClientId}
                     value={clientEmail}
                     onChange={(e) => setClientEmail(e.target.value)}
                     placeholder="cliente@email.com"
-                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 disabled:bg-slate-50 disabled:text-slate-500"
                   />
                 </div>
               </div>
@@ -125,6 +166,42 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
                     type="date"
                     value={eventDate}
                     onChange={(e) => setEventDate(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
+                </div>
+                
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Tipo de evento</label>
+                  <select
+                    value={eventType}
+                    onChange={(e) => setEventType(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
+                  >
+                    <option value="Boda">Boda</option>
+                    <option value="Corporativo">Corporativo</option>
+                    <option value="Fiesta Privada">Fiesta Privada</option>
+                    <option value="Concierto">Concierto</option>
+                    <option value="Otro">Otro</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Asistentes</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={eventAttendees}
+                    onChange={(e) => setEventAttendees(parseInt(e.target.value) || 0)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold text-slate-700">Duración (horas)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    step="0.5"
+                    value={eventDuration}
+                    onChange={(e) => setEventDuration(parseFloat(e.target.value) || 0)}
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                   />
                 </div>

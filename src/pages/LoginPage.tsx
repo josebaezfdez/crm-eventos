@@ -4,8 +4,9 @@ import { Button } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'
 import { useAuthStore } from '../store/useAuthStore'
 import { Lock, Mail, Loader2 } from 'lucide-react'
+import { API_BASE_URL } from '../config'
 
-const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
+const BASE_URL = API_BASE_URL
 
 export function LoginPage() {
   const login = useAuthStore(s => s.login)
