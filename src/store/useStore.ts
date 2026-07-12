@@ -96,7 +96,8 @@ const getHeaders = () => {
 }
 
 const api = {
-  post: (url: string, data: any) => fetch(BASE_URL + url, { method: 'POST', headers: getHeaders(), body: JSON.stringify(data) }),
+  get: (url: string) => fetch(BASE_URL + url, { headers: getHeaders() }).then(res => res.json()),
+  post: (url: string, data: any) => fetch(BASE_URL + url, { method: 'POST', headers: getHeaders(), body: JSON.stringify(data) }).then(res => res.json()),
   put: (url: string, data: any) => fetch(BASE_URL + url, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(data) }),
   delete: (url: string) => fetch(BASE_URL + url, { 
     method: 'DELETE', 

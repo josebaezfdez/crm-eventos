@@ -3,8 +3,7 @@ import { Link } from 'react-router-dom'
 import { PageHeader } from '../ui/PageHeader'
 import { Card, CardTitle, CardSubtitle } from '../ui/Card'
 import { Button } from '../ui/Button'
-import { CalendarDays, Plus, ArrowRight, User, Calendar, Loader2 } from 'lucide-react'
-import { EventFormModal } from '../events/EventFormModal'
+import { ArrowRight, User, Calendar, Loader2 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { formatDate } from '../../utils/format'
 
@@ -20,7 +19,6 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
   const [eventName, setEventName] = useState('')
   const [eventDate, setEventDate] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showExisting, setShowExisting] = useState(false)
 
   // Filter events that don't have an accepted budget, or just show recent ones
   const recentEvents = [...events].sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt)).slice(0, 5)
