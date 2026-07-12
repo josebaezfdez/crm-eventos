@@ -6,6 +6,7 @@ import { Button } from '../ui/Button'
 import { ArrowRight, User, Calendar, Loader2 } from 'lucide-react'
 import { useStore } from '../../store/useStore'
 import { formatDate } from '../../utils/format'
+import type { EventType } from '../../types'
 
 export function EventSelector({ onSelect }: { onSelect: (eventId: string) => void }) {
   const events = useStore((s) => s.events)
@@ -57,7 +58,7 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
         name: eventName,
         date: eventDate,
         location: '',
-        type: eventType as any,
+        type: eventType as EventType,
         attendees: eventAttendees,
         durationHours: eventDuration,
         status: 'draft',

@@ -74,7 +74,7 @@ export const events = sqliteTable('events', {
   location: text('location').notNull(),
   type: text('type').notNull(),
   attendees: integer('attendees').notNull(),
-  durationHours: integer('duration_hours').notNull(),
+  durationHours: real('duration_hours').notNull(),
   status: text('status').notNull(),
   acceptedBudgetId: text('accepted_budget_id'),
   notes: text('notes').notNull(),

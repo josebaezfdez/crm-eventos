@@ -75,6 +75,7 @@ interface AppState {
   // Sistema
   initApp: () => Promise<void>
   updateSettings: (patch: Partial<Company>) => Promise<void>
+  resetApp: () => void
 }
 
 import { API_BASE_URL } from '../config'
@@ -301,6 +302,20 @@ export const useStore = create<AppState>((set, get) => ({
     await api.put('/api/settings', patch)
     const current = get().settings || {} as Company
     set({ settings: { ...current, ...patch } })
+  },
+  resetApp: () => {
+    set({
+      isInitialized: false,
+      appError: null,
+      clients: [],
+      partners: [],
+      packages: [],
+      events: [],
+      budgets: [],
+      payments: [],
+      postEventResults: [],
+      settings: null,
+    })
   }
 }))
 

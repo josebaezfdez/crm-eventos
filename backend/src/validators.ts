@@ -42,7 +42,7 @@ export const partnerSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
   category: partnerCategoryEnum,
-  pricingType: partnerCategoryEnum.or(z.string()), // Allow string temporarily for migration, but ideally partnerPricingTypeEnum
+  pricingType: partnerPricingTypeEnum,
   hourlyRate: z.number().min(0),
   fixedRate: z.number().min(0),
   notes: z.string().optional(),
@@ -148,14 +148,14 @@ export const postEventResultSchema = z.object({
   savedAt: z.string().optional()
 }).strict();
 
-// Update schemas: partial, omit id, require at least one field
+// Update schemas: partial, omit id and createdAt, require at least one field
 const createUpdateSchema = (schema: z.ZodObject<any, any>) => 
-  schema.omit({ id: true })
+  schema.omit({ id: true, createdAt: true })
     .partial()
     .refine(data => Object.keys(data).length > 0, "Al menos un campo debe ser modificado");
 
 export const companyUpdateSchema = companySchema
-  .omit({ id: true })
+  .omit({ id: true, createdAt: true })
   .partial()
   .refine(data => Object.keys(data).length > 0, "Al menos un campo debe ser modificado");
 

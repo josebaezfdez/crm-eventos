@@ -38,14 +38,14 @@ const navGroups: NavGroup[] = [
   {
     name: 'Catálogo',
     items: [
-      { to: '/settings', search: '?tab=packages', label: 'Paquetes', icon: Package },
-      { to: '/settings', search: '?tab=partners', label: 'Proveedores', icon: Handshake },
+      { to: '/packages', label: 'Paquetes', icon: Package },
+      { to: '/partners', label: 'Proveedores', icon: Handshake },
     ],
   },
   {
     name: 'Administración',
     items: [
-      { to: '/settings', search: '?tab=profile', label: 'Empresa', icon: Building2 },
+      { to: '/settings', label: 'Empresa', icon: Building2 },
     ],
   },
 ]
