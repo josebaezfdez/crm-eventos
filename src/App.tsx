@@ -17,6 +17,8 @@ import SettingsPage from './pages/SettingsPage'
 import HelpPage from './pages/HelpPage'
 import PackageFormPage from './pages/PackageFormPage'
 import BudgetPdfPreview from './pages/BudgetPdfPreview'
+import PartnersPage from './pages/PartnersPage'
+import PackagesPage from './pages/PackagesPage'
 
 export default function App() {
   const isInitialized = useStore((s) => s.isInitialized)
@@ -34,11 +36,35 @@ export default function App() {
     return <LoginPage />
   }
 
+  const appError = useStore((s) => s.appError)
+
   if (!isInitialized) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-slate-50 text-slate-500">
         <Loader2 className="h-8 w-8 animate-spin text-brand-500" />
         <p className="mt-4 text-sm font-medium animate-pulse">Conectando con el servidor...</p>
+      </div>
+    )
+  }
+
+  if (appError) {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-slate-50 px-4">
+        <div className="max-w-md text-center">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-red-100">
+            <svg className="h-6 w-6 text-red-600" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900">No se han podido cargar los datos</h3>
+          <p className="mt-2 text-sm text-slate-500">{appError}</p>
+          <button 
+            onClick={() => initApp()}
+            className="mt-6 inline-flex items-center rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-500"
+          >
+            Reintentar
+          </button>
+        </div>
       </div>
     )
   }
@@ -60,8 +86,8 @@ export default function App() {
         <Route path="/help" element={<HelpPage />} />
         <Route path="/packages/new" element={<PackageFormPage />} />
         <Route path="/packages/:id/edit" element={<PackageFormPage />} />
-        <Route path="/partners" element={<Navigate to="/settings?tab=partners" replace />} />
-        <Route path="/packages" element={<Navigate to="/settings?tab=packages" replace />} />
+        <Route path="/partners" element={<PartnersPage />} />
+        <Route path="/packages" element={<PackagesPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </AppLayout>

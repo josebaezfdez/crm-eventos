@@ -1,69 +1,17 @@
 import { useState, useEffect } from 'react'
-import { useSearchParams } from 'react-router-dom'
 import { PageHeader } from '../components/ui/PageHeader'
 import { Card, CardTitle, CardSubtitle } from '../components/ui/Card'
 import { Input } from '../components/ui/Input'
 import { Button } from '../components/ui/Button'
-import { Save, Loader2, User, Handshake, Package } from 'lucide-react'
+import { Save, Loader2 } from 'lucide-react'
 import { useAuthStore } from '../store/useAuthStore'
 import { ImageUpload } from '../components/ui/ImageUpload'
-import PartnersPage from './PartnersPage'
-import PackagesPage from './PackagesPage'
 import { API_BASE_URL } from '../config'
 import { useStore } from '../store/useStore'
 
 const BASE_URL = API_BASE_URL
 
 export default function SettingsPage() {
-  const [searchParams, setSearchParams] = useSearchParams()
-  const currentTab = searchParams.get('tab') || 'profile'
-
-  const tabs = [
-    { id: 'profile', name: 'Mi Perfil', icon: User },
-    { id: 'partners', name: 'Partners', icon: Handshake },
-    { id: 'packages', name: 'Paquetes', icon: Package },
-  ]
-
-  return (
-    <div className="space-y-6">
-      <div className="border-b border-slate-200">
-        <nav className="-mb-px flex space-x-6" aria-label="Tabs">
-          {tabs.map((tab) => {
-            const Icon = tab.icon
-            const isActive = currentTab === tab.id
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setSearchParams({ tab: tab.id })}
-                className={`
-                  group inline-flex items-center border-b-2 py-4 px-1 text-sm font-medium
-                  ${isActive 
-                    ? 'border-brand-500 text-brand-600'
-                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
-                  }
-                `}
-              >
-                <Icon
-                  className={`mr-2 h-4 w-4 ${isActive ? 'text-brand-500' : 'text-slate-400 group-hover:text-slate-500'}`}
-                  aria-hidden="true"
-                />
-                {tab.name}
-              </button>
-            )
-          })}
-        </nav>
-      </div>
-
-      <div className="pt-2">
-        {currentTab === 'profile' && <ProfileTab />}
-        {currentTab === 'partners' && <PartnersPage />}
-        {currentTab === 'packages' && <PackagesPage />}
-      </div>
-    </div>
-  )
-}
-
-function ProfileTab() {
   const token = useAuthStore(s => s.token)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -102,6 +50,7 @@ function ProfileTab() {
       })
       .catch(() => setLoading(false))
   }, [token])
+  
   const updateSettings = useStore((s: any) => s.updateSettings)
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -131,13 +80,15 @@ function ProfileTab() {
       <form onSubmit={handleSubmit} className="space-y-6">
         
         <Card>
-          <CardTitle className="mb-1">Identidad Visual</CardTitle>
-          <CardSubtitle className="mb-5">Sube el logotipo de tu empresa. Usamos el claro para el menú lateral, y el oscuro para documentos de fondo blanco.</CardSubtitle>
+          <div className="mb-5">
+            <CardTitle>Identidad Visual</CardTitle>
+            <CardSubtitle>Logotipos de la empresa para personalizar la aplicación y los documentos PDF.</CardSubtitle>
+          </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
             <ImageUpload 
               label="Logo Modo Claro" 
-              description="Ideal para fondos oscuros."
+              description="Ideal para fondos oscuros (menú lateral)."
               value={formData.lightLogoUrl} 
               onChange={(url) => setFormData(f => ({ ...f, lightLogoUrl: url }))} 
               uploadUrl={BASE_URL + '/api/upload'}
@@ -145,7 +96,7 @@ function ProfileTab() {
             />
             <ImageUpload 
               label="Logo Modo Oscuro" 
-              description="Ideal para documentos (PDF)."
+              description="Ideal para fondos claros (documentos PDF)."
               value={formData.darkLogoUrl} 
               onChange={(url) => setFormData(f => ({ ...f, darkLogoUrl: url }))} 
               uploadUrl={BASE_URL + '/api/upload'}
@@ -155,8 +106,10 @@ function ProfileTab() {
         </Card>
 
         <Card>
-          <CardTitle className="mb-1">Datos Fiscales</CardTitle>
-          <CardSubtitle className="mb-5">Esta información aparecerá obligatoriamente en la cabecera de tus facturas y presupuestos generados.</CardSubtitle>
+          <div className="mb-5">
+            <CardTitle>Datos Fiscales</CardTitle>
+            <CardSubtitle>Esta información aparecerá obligatoriamente en la cabecera de tus presupuestos.</CardSubtitle>
+          </div>
           
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div className="sm:col-span-2">
@@ -174,7 +127,7 @@ function ProfileTab() {
 
         <div className="flex justify-end items-center gap-4">
           {success && <span className="text-sm text-green-600 font-medium">¡Guardado con éxito!</span>}
-          <Button type="submit" disabled={saving}>
+          <Button type="submit" disabled={saving} className="bg-brand-600 hover:bg-brand-700 text-white">
             {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
             Guardar Configuración
           </Button>

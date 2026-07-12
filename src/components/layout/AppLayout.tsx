@@ -65,11 +65,8 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
             <Menu size={20} />
           </button>
           <div className="flex flex-1 items-center gap-2">
-            <span className="hidden text-[13px] font-medium text-slate-400 sm:inline">
-              EventMargin
-            </span>
-            <span className="hidden text-slate-300 sm:inline">/</span>
-            <span className="hidden text-[13px] font-semibold text-slate-700 sm:inline">CRM Dashboard</span>
+            {/* The breadcrumbs are removed or simplified to standard CRM */}
+            <span className="text-[13px] font-semibold text-slate-700 sm:inline">EventMargin CRM</span>
           </div>
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 border-r border-slate-200 pr-4">

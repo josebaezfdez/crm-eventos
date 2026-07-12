@@ -178,9 +178,10 @@ export function EventSelector({ onSelect }: { onSelect: (eventId: string) => voi
                     className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 bg-white"
                   >
                     <option value="Boda">Boda</option>
-                    <option value="Corporativo">Corporativo</option>
-                    <option value="Fiesta Privada">Fiesta Privada</option>
-                    <option value="Concierto">Concierto</option>
+                    <option value="Cumpleaños">Cumpleaños</option>
+                    <option value="Empresa">Empresa</option>
+                    <option value="Afterwork">Afterwork</option>
+                    <option value="Fiesta privada">Fiesta privada</option>
                     <option value="Otro">Otro</option>
                   </select>
                 </div>

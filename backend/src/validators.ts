@@ -1,22 +1,32 @@
 import { z } from 'zod';
 
+// Enums
+export const eventTypeEnum = z.enum(['Boda', 'Cumpleaños', 'Empresa', 'Afterwork', 'Fiesta privada', 'Otro']);
+export const eventStatusEnum = z.enum(['draft', 'quoted', 'accepted', 'rejected', 'completed']);
+export const budgetStatusEnum = z.enum(['draft', 'sent', 'accepted', 'rejected']);
+export const paymentStatusEnum = z.enum(['pending', 'paid']);
+export const partnerCategoryEnum = z.enum(['DJ', 'Fotógrafo', 'Músico', 'Fotomatón', 'Camarero', 'Técnico sonido', 'Decoración', 'Otro']);
+export const partnerPricingTypeEnum = z.enum(['hourly', 'fixed']);
+export const budgetItemCategoryEnum = z.enum(['Bebida', 'Comida', 'Hielo', 'Vasos', 'Personal', 'Transporte', 'Alquiler', 'Partner', 'Decoración', 'Otros']);
+
 export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(1)
-});
+}).strict();
 
 export const companySchema = z.object({
   id: z.string(),
   name: z.string().min(1),
-  fiscalName: z.string().optional(),
-  nif: z.string().optional(),
+  taxId: z.string().optional(),
   address: z.string().optional(),
   phone: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   website: z.string().optional(),
+  logoUrl: z.string().optional(),
   lightLogoUrl: z.string().optional(),
-  darkLogoUrl: z.string().optional()
-});
+  darkLogoUrl: z.string().optional(),
+  createdAt: z.string().optional()
+}).strict();
 
 export const clientSchema = z.object({
   id: z.string(),
@@ -26,20 +36,29 @@ export const clientSchema = z.object({
   company: z.string(),
   notes: z.string().optional(),
   createdAt: z.string().optional()
-});
+}).strict();
 
 export const partnerSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
-  category: z.string(),
-  pricingType: z.string(),
+  category: partnerCategoryEnum,
+  pricingType: partnerCategoryEnum.or(z.string()), // Allow string temporarily for migration, but ideally partnerPricingTypeEnum
   hourlyRate: z.number().min(0),
   fixedRate: z.number().min(0),
   notes: z.string().optional(),
   phone: z.string(),
   email: z.string().email().or(z.literal('')),
   createdAt: z.string().optional()
-});
+}).strict();
+
+export const packageItemSchema = z.object({
+  name: z.string(),
+  category: budgetItemCategoryEnum,
+  quantity: z.number(),
+  unitCost: z.number(),
+  unitPrice: z.number(),
+  isVisibleToClient: z.boolean()
+}).strict();
 
 export const packageSchema = z.object({
   id: z.string(),
@@ -49,10 +68,10 @@ export const packageSchema = z.object({
   baseCost: z.number().min(0),
   recommendedPrice: z.number().min(0),
   partnerIds: z.array(z.string()),
-  customItems: z.array(z.any()),
+  customItems: z.array(packageItemSchema),
   marginTarget: z.number(),
   createdAt: z.string().optional()
-});
+}).strict();
 
 export const eventSchema = z.object({
   id: z.string(),
@@ -60,21 +79,34 @@ export const eventSchema = z.object({
   name: z.string().min(1),
   date: z.string(),
   location: z.string(),
-  type: z.string(),
+  type: eventTypeEnum,
   attendees: z.number().min(1),
   durationHours: z.number().min(0),
-  status: z.string(),
+  status: eventStatusEnum,
   acceptedBudgetId: z.string().nullable().optional(),
   notes: z.string().optional(),
   createdAt: z.string().optional()
-});
+}).strict();
+
+export const budgetItemSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  category: budgetItemCategoryEnum,
+  quantity: z.number(),
+  unitCost: z.number(),
+  totalCost: z.number(),
+  unitPrice: z.number(),
+  totalPrice: z.number(),
+  isInternalCost: z.boolean(),
+  isVisibleToClient: z.boolean()
+}).strict();
 
 export const budgetSchema = z.object({
   id: z.string(),
   eventId: z.string(),
   clientId: z.string(),
   packageId: z.string().nullable().optional(),
-  items: z.array(z.any()),
+  items: z.array(budgetItemSchema),
   directCosts: z.number(),
   partnerCosts: z.number(),
   laborCosts: z.number(),
@@ -88,26 +120,33 @@ export const budgetSchema = z.object({
   vatPercentage: z.number(),
   expectedProfit: z.number(),
   expectedMarginPercentage: z.number(),
-  status: z.string(),
+  status: budgetStatusEnum,
   createdAt: z.string().optional()
-});
+}).strict();
 
 export const paymentSchema = z.object({
   id: z.string(),
   eventId: z.string(),
   amount: z.number(),
   dueDate: z.string(),
-  status: z.string(),
+  status: paymentStatusEnum,
   concept: z.string()
-});
+}).strict();
+
+export const realCostLineSchema = z.object({
+  category: budgetItemCategoryEnum,
+  budgeted: z.number(),
+  real: z.number()
+}).strict();
 
 export const postEventResultSchema = z.object({
   eventId: z.string(),
   chargedPrice: z.number(),
-  realCostLines: z.array(z.any()),
+  realCostLines: z.array(realCostLineSchema),
   realTotalCost: z.number(),
-  notes: z.string().optional()
-});
+  notes: z.string().optional(),
+  savedAt: z.string().optional()
+}).strict();
 
 // Update schemas: partial, omit id, require at least one field
 const createUpdateSchema = (schema: z.ZodObject<any, any>) => 

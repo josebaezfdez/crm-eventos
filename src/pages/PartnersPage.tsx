@@ -11,23 +11,11 @@ import { useStore } from '../store/useStore'
 import { formatCurrency } from '../utils/format'
 import type { Partner, PartnerCategory, PartnerPricingType } from '../types'
 import {
-  Plus, Pencil, Trash2, Handshake, Mail, Phone, Music, Camera, Mic,
-  Image, User, HardHat, Palette, Box, Euro,
+  Plus, Trash2, Handshake, Mail, Phone,
+  MoreVertical, Edit3
 } from 'lucide-react'
-import type { LucideIcon } from 'lucide-react'
 
 const CATEGORIES: PartnerCategory[] = ['DJ', 'Fotógrafo', 'Músico', 'Fotomatón', 'Camarero', 'Técnico sonido', 'Decoración', 'Otro']
-
-const categoryIcon: Record<PartnerCategory, LucideIcon> = {
-  'DJ': Music,
-  'Fotógrafo': Camera,
-  'Músico': Mic,
-  'Fotomatón': Image,
-  'Camarero': User,
-  'Técnico sonido': HardHat,
-  'Decoración': Palette,
-  'Otro': Box,
-}
 
 const emptyForm = {
   name: '', category: 'DJ' as PartnerCategory, pricingType: 'fixed' as PartnerPricingType,
@@ -44,6 +32,7 @@ export default function PartnersPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState(emptyForm)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [menuOpenId, setMenuOpenId] = useState<string | null>(null)
 
   const openNew = () => { setForm(emptyForm); setEditingId(null); setModalOpen(true) }
   const openEdit = (p: Partner) => {
@@ -51,8 +40,15 @@ export default function PartnersPage() {
       name: p.name, category: p.category, pricingType: p.pricingType,
       hourlyRate: p.hourlyRate, fixedRate: p.fixedRate, notes: p.notes, phone: p.phone, email: p.email,
     })
-    setEditingId(p.id); setModalOpen(true)
+    setEditingId(p.id)
+    setMenuOpenId(null)
+    setModalOpen(true)
   }
+  const confirmDelete = (id: string) => {
+    setDeleteId(id)
+    setMenuOpenId(null)
+  }
+
   const [isSaving, setIsSaving] = useState(false)
   const save = async () => {
     if (!form.name.trim()) return
@@ -69,52 +65,89 @@ export default function PartnersPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Proveedores"
-        title="Partners"
-        description="Proveedores externos que subcontractas. Sus precios entran automáticamente en los presupuestos."
-        actions={<Button onClick={openNew}><Plus size={16} /> Nuevo partner</Button>}
+        title="Proveedores"
+        description="Gestiona los proveedores externos y sus tarifas. Podrás añadirlos a tus presupuestos automáticamente."
+        actions={<Button onClick={openNew} className="bg-brand-600 hover:bg-brand-700 text-white"><Plus size={16} className="mr-2" /> Nuevo partner</Button>}
       />
 
       {partners.length === 0 ? (
-        <EmptyState title="Sin partners" description="Añade DJs, fotógrafos, camareros…" icon={<Handshake size={22} />} action={<Button size="sm" onClick={openNew}><Plus size={15} /> Nuevo partner</Button>} />
+        <EmptyState title="Sin proveedores" description="Añade DJs, fotógrafos, camareros…" icon={<Handshake size={22} />} action={<Button size="sm" onClick={openNew}><Plus size={15} className="mr-2"/> Nuevo partner</Button>} />
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {partners.map((p) => {
-            const Icon = categoryIcon[p.category]
-            return (
-              <Card key={p.id} hover>
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="icon-chip-brand shrink-0"><Icon size={18} /></div>
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-slate-900">{p.name}</p>
-                      <Badge color="brand" className="mt-1">{p.category}</Badge>
-                    </div>
-                  </div>
-                  <Button variant="ghost" size="sm" onClick={() => openEdit(p)}><Pencil size={14} /></Button>
-                </div>
+        <Card padded={false} className="overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-sm text-slate-600">
+              <thead className="border-b border-slate-200 bg-slate-50 text-xs uppercase text-slate-500">
+                <tr>
+                  <th scope="col" className="px-6 py-4 font-semibold">Proveedor</th>
+                  <th scope="col" className="px-6 py-4 font-semibold">Categoría</th>
+                  <th scope="col" className="px-6 py-4 font-semibold">Tarifa</th>
+                  <th scope="col" className="px-6 py-4 font-semibold">Contacto</th>
+                  <th scope="col" className="px-6 py-4 text-right font-semibold">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {partners.map((p) => (
+                  <tr key={p.id} className="hover:bg-slate-50/50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="font-semibold text-slate-900">{p.name}</div>
+                      {p.notes && <div className="mt-0.5 text-xs text-slate-400 truncate max-w-[200px]">{p.notes}</div>}
+                    </td>
+                    <td className="px-6 py-4">
+                      <Badge color="slate">{p.category}</Badge>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="font-medium text-slate-900">
+                        {p.pricingType === 'fixed' ? formatCurrency(p.fixedRate) : formatCurrency(p.hourlyRate)}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {p.pricingType === 'fixed' ? 'por evento' : 'por hora'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col space-y-1 text-xs">
+                        {p.phone && <span className="flex items-center gap-1.5"><Phone size={12} className="text-slate-400"/>{p.phone}</span>}
+                        {p.email && <span className="flex items-center gap-1.5"><Mail size={12} className="text-slate-400"/>{p.email}</span>}
+                        {!p.phone && !p.email && <span className="text-slate-400 italic">Sin contacto</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right relative">
+                      <div className="flex justify-end relative">
+                         <button 
+                            className="p-1.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-100 transition-colors"
+                            onClick={() => setMenuOpenId(menuOpenId === p.id ? null : p.id)}
+                         >
+                            <MoreVertical size={18} />
+                         </button>
 
-                <div className="mt-4 rounded-xl bg-gradient-to-br from-brand-50/70 to-accent-50/40 p-3.5 text-center ring-1 ring-inset ring-slate-100">
-                  <p className="flex items-center justify-center gap-1.5 text-xs text-slate-400"><Euro size={12} /> Precio</p>
-                  <p className="tnum mt-0.5 text-xl font-bold text-slate-900">
-                    {p.pricingType === 'fixed' ? formatCurrency(p.fixedRate) : formatCurrency(p.hourlyRate)}
-                    <span className="text-sm font-normal text-slate-400"> / {p.pricingType === 'fixed' ? 'evento' : 'hora'}</span>
-                  </p>
-                </div>
-
-                <dl className="mt-3 space-y-1.5 text-sm text-slate-600">
-                  <div className="flex items-center gap-2"><Phone size={13} className="text-slate-400" /> {p.phone || '—'}</div>
-                  <div className="flex items-center gap-2"><Mail size={13} className="text-slate-400" /> <span className="truncate">{p.email || '—'}</span></div>
-                </dl>
-                {p.notes && <p className="mt-2 text-xs text-slate-400">{p.notes}</p>}
-
-                <div className="mt-4 flex justify-end">
-                  <Button variant="danger" size="sm" onClick={() => setDeleteId(p.id)}><Trash2 size={14} /> Eliminar</Button>
-                </div>
-              </Card>
-            )
-          })}
-        </div>
+                         {menuOpenId === p.id && (
+                           <>
+                             <div className="fixed inset-0 z-10" onClick={() => setMenuOpenId(null)} />
+                             <div className="absolute right-0 top-8 z-20 w-36 rounded-md bg-white py-1 shadow-lg ring-1 ring-black ring-opacity-5">
+                                <button
+                                  className="group flex w-full items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 hover:text-brand-600"
+                                  onClick={() => openEdit(p)}
+                                >
+                                  <Edit3 size={14} className="mr-2 text-slate-400 group-hover:text-brand-500" />
+                                  Editar
+                                </button>
+                                <button
+                                  className="group flex w-full items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                                  onClick={() => confirmDelete(p.id)}
+                                >
+                                  <Trash2 size={14} className="mr-2 text-red-500" />
+                                  Eliminar
+                                </button>
+                             </div>
+                           </>
+                         )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
       <Modal
@@ -153,7 +186,7 @@ export default function PartnersPage() {
       <ConfirmDialog
         open={!!deleteId}
         title="Eliminar partner"
-        message="¿Seguro que quieres eliminar este partner?"
+        message="¿Seguro que quieres eliminar este proveedor? Ya no estará disponible para nuevos presupuestos."
         confirmLabel="Eliminar"
         onConfirm={() => { if (deleteId) deletePartner(deleteId); setDeleteId(null) }}
         onCancel={() => setDeleteId(null)}

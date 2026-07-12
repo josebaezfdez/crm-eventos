@@ -46,6 +46,7 @@ export const partners = sqliteTable('partners', {
   notes: text('notes').notNull(),
   phone: text('phone').notNull(),
   email: text('email').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).default(true).notNull(),
   createdAt: text('created_at').notNull(),
 });
 
@@ -60,6 +61,7 @@ export const packages = sqliteTable('packages', {
   partnerIds: text('partner_ids', { mode: 'json' }).notNull(),
   customItems: text('custom_items', { mode: 'json' }).notNull(),
   marginTarget: real('margin_target').notNull(),
+  isActive: integer('is_active', { mode: 'boolean' }).default(true).notNull(),
   createdAt: text('created_at').notNull(),
 });
 

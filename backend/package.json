@@ -8,7 +8,9 @@
     "deploy": "wrangler deploy",
     "db:generate": "drizzle-kit generate",
     "db:migrate:local": "wrangler d1 migrations apply malatesta-db --local",
-    "db:migrate:remote": "wrangler d1 migrations apply malatesta-db --remote"
+    "db:migrate:remote": "wrangler d1 migrations apply malatesta-db --remote",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "drizzle-orm": "^0.33.0",

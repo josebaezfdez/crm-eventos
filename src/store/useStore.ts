@@ -25,6 +25,7 @@ import { useAuthStore } from './useAuthStore'
 
 interface AppState {
   isInitialized: boolean
+  appError: string | null
   clients: Client[]
   partners: Partner[]
   packages: Package[]
@@ -123,6 +124,7 @@ const api = {
 
 export const useStore = create<AppState>((set, get) => ({
   isInitialized: false,
+  appError: null,
   clients: [],
   partners: [],
   packages: [],
@@ -280,6 +282,7 @@ export const useStore = create<AppState>((set, get) => ({
       const data = await api.get('/api/all')
       set({
         isInitialized: true,
+        appError: null,
         settings: data.settings || null,
         clients: data.clients || [],
         partners: data.partners || [],
@@ -289,9 +292,9 @@ export const useStore = create<AppState>((set, get) => ({
         payments: data.payments || [],
         postEventResults: data.postEventResults || [],
       })
-    } catch (e) {
+    } catch (e: any) {
       console.error("Error connecting to backend", e)
-      set({ isInitialized: true })
+      set({ isInitialized: true, appError: e.message || 'Error al conectar con el servidor. Por favor, reinténtalo.' })
     }
   },
   updateSettings: async (patch) => {

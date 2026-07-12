@@ -115,8 +115,8 @@ app.get('/api/all', async (c) => {
     companies,
   ] = await Promise.all([
     db.select().from(schema.clients).where(eq(schema.clients.companyId, companyId)),
-    db.select().from(schema.partners).where(eq(schema.partners.companyId, companyId)),
-    db.select().from(schema.packages).where(eq(schema.packages.companyId, companyId)),
+    db.select().from(schema.partners).where(and(eq(schema.partners.companyId, companyId), eq(schema.partners.isActive, true))),
+    db.select().from(schema.packages).where(and(eq(schema.packages.companyId, companyId), eq(schema.packages.isActive, true))),
     db.select().from(schema.events).where(eq(schema.events.companyId, companyId)),
     db.select().from(schema.budgets).where(eq(schema.budgets.companyId, companyId)),
     db.select().from(schema.payments).where(eq(schema.payments.companyId, companyId)),
@@ -212,7 +212,7 @@ app.delete('/api/partners/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.delete(schema.partners).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
+  await db.update(schema.partners).set({ isActive: false }).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
   return c.json({ success: true })
 })
 
@@ -246,7 +246,7 @@ app.delete('/api/packages/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.delete(schema.packages).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
+  await db.update(schema.packages).set({ isActive: false }).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
   return c.json({ success: true })
 })
 
@@ -397,7 +397,7 @@ app.post('/api/upload', async (c) => {
     const file = formData.get('file') as unknown as File
     if (!file) return c.json({ error: 'No file provided' }, 400)
     
-    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']
+    const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp']
     if (!allowedMimeTypes.includes(file.type)) return c.json({ error: 'Formato no permitido' }, 400)
     if (file.size > 2 * 1024 * 1024) return c.json({ error: 'El archivo excede 2MB' }, 400)
     
