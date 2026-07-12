@@ -60,27 +60,31 @@ async function hashPassword(password: string, providedSalt?: string): Promise<{ 
 }
 
 app.post('/api/auth/login', async (c) => {
-  const body = await c.req.json()
-  const parsed = validators.loginSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  const { email, password } = parsed.data
-  const db = drizzle(c.env.DB)
-  const users = await db.select().from(schema.users).where(eq(schema.users.email, email))
-  
-  const user = users[0]
-  if (!user) return c.json({ error: 'User not found' }, 401)
-  
-  const { hash } = await hashPassword(password, user.passwordSalt)
-  if (user.passwordHash !== hash) {
-    return c.json({ error: 'Invalid password' }, 401)
-  }
+  try {
+    const body = await c.req.json()
+    const parsed = validators.loginSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error }, 400)
+    const { email, password } = parsed.data
+    const db = drizzle(c.env.DB)
+    const users = await db.select().from(schema.users).where(eq(schema.users.email, email))
+    
+    const user = users[0]
+    if (!user) return c.json({ error: 'User not found' }, 401)
+    
+    const { hash } = await hashPassword(password, user.passwordSalt)
+    if (user.passwordHash !== hash) {
+      return c.json({ error: 'Invalid password' }, 401)
+    }
 
-  const secret = c.env.JWT_SECRET
-  if (!secret) throw new Error("JWT_SECRET is not configured")
-  
-  const token = await sign({ id: user.id, email: user.email, companyId: user.companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
-  
-  return c.json({ token, user: { id: user.id, email: user.email, name: user.name, companyId: user.companyId } })
+    const secret = c.env.JWT_SECRET
+    if (!secret) return c.json({ error: 'Server configuration error' }, 500)
+    
+    const token = await sign({ id: user.id, email: user.email, companyId: user.companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
+    
+    return c.json({ token, user: { id: user.id, email: user.email, name: user.name, companyId: user.companyId } })
+  } catch (err: any) {
+    return c.json({ error: 'Internal server error' }, 500)
+  }
 })
 
 app.use('/api/*', async (c, next) => {
