@@ -35,6 +35,14 @@ jobs:
       working-directory: ./backend
       run: npm ci
 
+    - name: Typecheck Backend
+      working-directory: ./backend
+      run: npm run typecheck
+
     - name: Test Backend
       working-directory: ./backend
       run: npm run test
+
+    - name: Validate Worker Build (Dry Run)
+      working-directory: ./backend
+      run: npx wrangler deploy --dry-run --outdir=dist

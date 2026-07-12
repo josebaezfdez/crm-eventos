@@ -171,14 +171,16 @@ app.put('/api/clients/:id', async (c) => {
   const body = await c.req.json()
   const parsed = validators.clientUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  await db.update(schema.clients).set(parsed.data).where(and(eq(schema.clients.id, id), eq(schema.clients.companyId, companyId)))
+  const result = await db.update(schema.clients).set(parsed.data).where(and(eq(schema.clients.id, id), eq(schema.clients.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/clients/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.delete(schema.clients).where(and(eq(schema.clients.id, id), eq(schema.clients.companyId, companyId)))
+  const result = await db.delete(schema.clients).where(and(eq(schema.clients.id, id), eq(schema.clients.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 
@@ -205,14 +207,16 @@ app.put('/api/partners/:id', async (c) => {
   const body = await c.req.json()
   const parsed = validators.partnerUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  await db.update(schema.partners).set(parsed.data).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
+  const result = await db.update(schema.partners).set(parsed.data).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/partners/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.update(schema.partners).set({ isActive: false }).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
+  const result = await db.update(schema.partners).set({ isActive: false }).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 
@@ -239,14 +243,16 @@ app.put('/api/packages/:id', async (c) => {
   const body = await c.req.json()
   const parsed = validators.packageUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  await db.update(schema.packages).set(parsed.data).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
+  const result = await db.update(schema.packages).set(parsed.data).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/packages/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.update(schema.packages).set({ isActive: false }).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
+  const result = await db.update(schema.packages).set({ isActive: false }).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 
@@ -273,14 +279,16 @@ app.put('/api/events/:id', async (c) => {
   const body = await c.req.json()
   const parsed = validators.eventUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  await db.update(schema.events).set(parsed.data).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
+  const result = await db.update(schema.events).set(parsed.data).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/events/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.delete(schema.events).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
+  const result = await db.delete(schema.events).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 
@@ -307,14 +315,16 @@ app.put('/api/budgets/:id', async (c) => {
   const body = await c.req.json()
   const parsed = validators.budgetUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  await db.update(schema.budgets).set(parsed.data).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
+  const result = await db.update(schema.budgets).set(parsed.data).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/budgets/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.delete(schema.budgets).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
+  const result = await db.delete(schema.budgets).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 
@@ -340,14 +350,16 @@ app.put('/api/payments/:id', async (c) => {
   const body = await c.req.json()
   const parsed = validators.paymentUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  await db.update(schema.payments).set(parsed.data).where(and(eq(schema.payments.id, id), eq(schema.payments.companyId, companyId)))
+  const result = await db.update(schema.payments).set(parsed.data).where(and(eq(schema.payments.id, id), eq(schema.payments.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/payments/:id', async (c) => {
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
-  await db.delete(schema.payments).where(and(eq(schema.payments.id, id), eq(schema.payments.companyId, companyId)))
+  const result = await db.delete(schema.payments).where(and(eq(schema.payments.id, id), eq(schema.payments.companyId, companyId)))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 
@@ -386,7 +398,8 @@ app.put('/api/settings', async (c) => {
   const parsed = validators.companyUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   
-  await db.update(schema.companies).set(parsed.data).where(eq(schema.companies.id, companyId))
+  const result = await db.update(schema.companies).set(parsed.data).where(eq(schema.companies.id, companyId))
+  if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 

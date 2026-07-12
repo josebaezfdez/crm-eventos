@@ -7,8 +7,6 @@ interface AuthState {
   logout: () => void
 }
 
-import { useStore } from './useStore'
-
 export const useAuthStore = create<AuthState>((set) => ({
   token: localStorage.getItem('auth_token'),
   user: localStorage.getItem('auth_user') ? JSON.parse(localStorage.getItem('auth_user') as string) : null,
@@ -21,6 +19,5 @@ export const useAuthStore = create<AuthState>((set) => ({
     localStorage.removeItem('auth_token')
     localStorage.removeItem('auth_user')
     set({ token: null, user: null })
-    useStore.getState().resetApp()
   },
 }))

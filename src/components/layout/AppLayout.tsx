@@ -8,7 +8,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const user = useAuthStore(s => s.user)
-  const logout = useAuthStore(s => s.logout)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -109,7 +108,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
                     <button
                       onClick={() => {
                         setUserMenuOpen(false)
-                        logout()
+                        window.dispatchEvent(new Event('auth-unauthorized'))
                       }}
                       className="group flex w-full items-center px-4 py-2 text-sm text-slate-700 hover:bg-red-50 hover:text-red-600"
                     >

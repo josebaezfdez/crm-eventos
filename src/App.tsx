@@ -32,6 +32,15 @@ export default function App() {
     }
   }, [isInitialized, initApp, token])
 
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      useAuthStore.getState().logout()
+      useStore.getState().resetApp()
+    }
+    window.addEventListener('auth-unauthorized', handleUnauthorized)
+    return () => window.removeEventListener('auth-unauthorized', handleUnauthorized)
+  }, [])
+
   if (!token) {
     return <LoginPage />
   }

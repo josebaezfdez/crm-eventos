@@ -21,7 +21,6 @@ import type {
 
 import { buildBudgetSummary, recalcBudget } from '../utils/marginCalculator'
 import { uid } from '../utils/format'
-import { useAuthStore } from './useAuthStore'
 
 interface AppState {
   isInitialized: boolean
@@ -82,7 +81,7 @@ import { API_BASE_URL } from '../config'
 const BASE_URL = API_BASE_URL
 
 const getHeaders = () => {
-  const token = useAuthStore.getState().token
+  const token = localStorage.getItem('auth_token')
   return {
     'Content-Type': 'application/json',
     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -91,7 +90,7 @@ const getHeaders = () => {
 
 const handleResponse = async (res: Response) => {
   if (res.status === 401) {
-    useAuthStore.getState().logout()
+    window.dispatchEvent(new Event('auth-unauthorized'))
     throw new Error('Sesión caducada o no autorizada. Por favor, inicia sesión de nuevo.')
   }
   if (!res.ok) {
@@ -119,7 +118,7 @@ const api = {
   put: (url: string, data: any) => fetch(BASE_URL + url, { method: 'PUT', headers: getHeaders(), body: JSON.stringify(data) }).then(handleResponse),
   delete: (url: string) => fetch(BASE_URL + url, { 
     method: 'DELETE', 
-    headers: useAuthStore.getState().token ? { 'Authorization': `Bearer ${useAuthStore.getState().token}` } : {} 
+    headers: localStorage.getItem('auth_token') ? { 'Authorization': `Bearer ${localStorage.getItem('auth_token')}` } : {}
   }).then(handleResponse),
 }
 
