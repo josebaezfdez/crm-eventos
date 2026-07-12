@@ -118,7 +118,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                     onClick={() => handleSwitch(m.companyId)}
                     className={`w-full text-left px-3 py-2.5 text-sm transition-colors flex items-center justify-between ${isActive ? 'bg-brand-500/10 text-brand-400 font-medium' : 'text-slate-300 hover:bg-slate-700 hover:text-white'}`}
                   >
-                    <span className="truncate">{m.companyId === user?.companyId ? companyName : `Workspace ${m.companyId.substring(0,8)}`}</span>
+                    <span className="truncate">{m.companyId === user?.companyId ? companyName : (m.companyName || `Workspace ${m.companyId.substring(0,8)}`)}</span>
                     {isActive && <div className="w-1.5 h-1.5 rounded-full bg-brand-500" />}
                   </button>
                 )

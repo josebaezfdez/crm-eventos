@@ -36,9 +36,9 @@ describe('Multi-tenant Isolation & Soft Delete', () => {
       { id: 'client_B1', companyId: companyB, name: 'Client B1', email: 'b@b.com', phone: '', company: '', notes: '', createdAt: new Date().toISOString() }
     ]);
 
-    // Generar JWTs
-    tokenA = await sign({ id: 'user_A', email: 'user@a.com', companyId: companyA, exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
-    tokenB = await sign({ id: 'user_B', email: 'user@b.com', companyId: companyB, exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
+    // Generar JWTs con role ADMIN para no interferir con RBAC
+    tokenA = await sign({ id: 'user_A', email: 'user@a.com', companyId: companyA, role: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
+    tokenB = await sign({ id: 'user_B', email: 'user@b.com', companyId: companyB, role: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
   })
 
   it('Empresa A no ve a los clientes de Empresa B', async () => {
@@ -111,5 +111,64 @@ describe('Multi-tenant Isolation & Soft Delete', () => {
     // Verificar que no se creó
     const aEvents = await db.select().from(schema.events).where(eq(schema.events.id, 'event_A1')) as any[];
     expect(aEvents.length).toBe(0);
+  });
+
+  it('deniega acceso a asset privado de otro tenant', async () => {
+    // The /api/assets/* endpoint checks that private/* keys start with the requester's companyId
+    // Attempt to access a key that belongs to company B while authenticated as company A
+    const req = new Request('http://localhost/api/assets/private/comp_B/documents/secret.pdf', {
+      headers: { Authorization: `Bearer ${tokenA}` }
+    });
+    const res = await app.request(req, {}, env);
+    // Must be 403 — tenantA should never access tenantB's private files
+    expect(res.status).toBe(403);
+  });
+
+  it('paquetes archivados (isActive=false) no aparecen en el listado', async () => {
+    const companyA = 'comp_A';
+    const pkgActiveId = `pkg_active_${crypto.randomUUID()}`;
+    const pkgArchivedId = `pkg_archived_${crypto.randomUUID()}`;
+    // Insert one active and one archived package for company A
+    await db.insert(schema.packages).values([
+      { id: pkgActiveId, companyId: companyA, name: 'Activo', description: '', baseHours: 0, baseCost: 0, recommendedPrice: 0, partnerIds: [], customItems: [], marginTarget: 0, isActive: true, createdAt: new Date().toISOString() },
+      { id: pkgArchivedId, companyId: companyA, name: 'Archivado', description: '', baseHours: 0, baseCost: 0, recommendedPrice: 0, partnerIds: [], customItems: [], marginTarget: 0, isActive: false, createdAt: new Date().toISOString() }
+    ]);
+
+    const req = new Request('http://localhost/api/all', {
+      headers: { Authorization: `Bearer ${tokenA}` }
+    });
+    const res = await app.request(req, {}, env);
+    const data = await res.json() as any;
+
+    const pkgIds = (data.packages as any[]).map((p: any) => p.id);
+    expect(pkgIds).toContain(pkgActiveId);
+    expect(pkgIds).not.toContain(pkgArchivedId);
+  });
+
+  it('PUT presupuesto con clientId de otro tenant devuelve 400 con mensaje correcto', async () => {
+    const companyA = 'comp_A';
+    const companyB = 'comp_B';
+    const evtId = `evt_iso_${crypto.randomUUID()}`;
+    const budId = `bud_iso_${crypto.randomUUID()}`;
+    
+    // Setup: event and budget for company A
+    await db.insert(schema.events).values([
+      { id: evtId, companyId: companyA, clientId: 'client_A1', name: 'Ev A', date: '2026-01-01', location: 'L', type: 'T', attendees: 1, durationHours: 1, status: 'draft', notes: '', createdAt: new Date().toISOString() }
+    ]);
+    await db.insert(schema.budgets).values([
+      { id: budId, companyId: companyA, eventId: evtId, clientId: 'client_A1', items: [], directCosts: 0, partnerCosts: 0, laborCosts: 0, indirectCosts: 0, totalCost: 0, targetMarginPercentage: 0, recommendedPriceWithoutVAT: 0, recommendedPriceWithVAT: 0, offeredPriceWithoutVAT: 0, offeredPriceWithVAT: 0, vatPercentage: 0, expectedProfit: 0, expectedMarginPercentage: 0, status: 'draft', createdAt: new Date().toISOString() }
+    ]);
+
+    // Attempt: company A user tries to assign client_B1 (belongs to B) to its budget
+    const req = new Request(`http://localhost/api/budgets/${budId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenA}` },
+      body: JSON.stringify({ clientId: 'client_B1' })
+    });
+    const res = await app.request(req, {}, env);
+    expect(res.status).toBe(400);
+    const data = await res.json() as any;
+    // Should get the tenant-isolation error, NOT the cross-validation error
+    expect(data.error).toContain('no pertenece a la empresa');
   });
 });

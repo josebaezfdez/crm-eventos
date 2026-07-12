@@ -14,3 +14,7 @@ migrations_dir = "drizzle"
 [[r2_buckets]]
 binding = "ASSETS"
 bucket_name = "malatesta-assets"
+
+[[kv_namespaces]]
+binding = "MALATESTA_KV"
+id = "2face44d339d4676aad14dfc3a63bf9e"

@@ -20,6 +20,16 @@ export const users = sqliteTable('users', {
   passwordHash: text('password_hash').notNull(),
   passwordSalt: text('password_salt').notNull(),
   name: text('name').notNull(),
+  emailVerified: integer('email_verified', { mode: 'boolean' }).default(false).notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const authTokens = sqliteTable('auth_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  type: text('type').notNull(), // 'VERIFICATION' | 'RECOVERY'
+  expiresAt: integer('expires_at').notNull(), // timestamp
   createdAt: text('created_at').notNull(),
 });
 

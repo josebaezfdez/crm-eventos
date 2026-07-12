@@ -27,9 +27,15 @@ export async function assertTenantResources(
   }
 }
 
-export async function assertAdminRole(c: any, db: any): Promise<void> {
+import { HTTPException } from 'hono/http-exception'
+
+export function requireRole(c: any, requiredRole: string = 'ADMIN'): void {
   const jwtPayload = c.get('jwtPayload')
-  // We need to query company_memberships
-  // We import schema in the place where this is called, or we can just pass the memberships table
-  // To avoid circular dependencies, let's just accept the memberships table as an argument
+  if (!jwtPayload || jwtPayload.role !== requiredRole) {
+    const res = new Response(JSON.stringify({ error: `Forbidden: ${requiredRole} role required` }), {
+      status: 403,
+      headers: { 'Content-Type': 'application/json' }
+    })
+    throw new HTTPException(403, { res })
+  }
 }

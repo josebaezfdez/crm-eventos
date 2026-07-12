@@ -7,6 +7,7 @@ export interface CompanyMembership {
   companyId: string
   role: string
   status: string
+  companyName?: string
 }
 
 interface AuthState {

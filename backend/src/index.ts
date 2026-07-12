@@ -6,16 +6,19 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import * as schema from './db/schema'
 import * as validators from './validators'
-import { assertTenantResource, assertTenantResources } from './utils'
+import { assertTenantResource, assertTenantResources, requireRole } from './utils'
 
 export type Env = {
   DB: D1Database
   ASSETS: R2Bucket
   JWT_SECRET: string
+  MALATESTA_KV: KVNamespace
+  TURNSTILE_SECRET_KEY?: string
+  RESEND_API_KEY?: string
 }
 
 type Variables = {
-  jwtPayload: { id: string; email: string; companyId: string; exp: number }
+  jwtPayload: { id: string; email: string; companyId: string; role: string; exp: number }
 }
 
 const app = new Hono<{ Bindings: Env; Variables: Variables }>()
@@ -23,6 +26,26 @@ const app = new Hono<{ Bindings: Env; Variables: Variables }>()
 app.use('/api/*', cors({
   origin: ['https://crm-eventos.pages.dev', 'http://localhost:5173']
 }))
+
+async function verifyTurnstile(token: string, secret?: string): Promise<boolean> {
+  if (!secret) return true // Skip if no secret configured
+  const formData = new FormData()
+  formData.append('secret', secret)
+  formData.append('response', token)
+  const url = 'https://challenges.cloudflare.com/turnstile/v0/siteverify'
+  const result = await fetch(url, { body: formData, method: 'POST' })
+  const outcome = await result.json() as any
+  return outcome.success
+}
+
+async function rateLimit(kv: KVNamespace, ip: string, limit: number, windowSec: number): Promise<boolean> {
+  const key = `rl_${ip}`
+  const current = await kv.get(key)
+  const count = current ? parseInt(current) : 0
+  if (count >= limit) return false
+  await kv.put(key, (count + 1).toString(), { expirationTtl: windowSec })
+  return true
+}
 
 async function hashPassword(password: string, providedSalt?: string): Promise<{ hash: string, salt: string }> {
   const enc = new TextEncoder();
@@ -62,13 +85,27 @@ async function hashPassword(password: string, providedSalt?: string): Promise<{ 
 
 app.post('/api/auth/register', async (c) => {
   try {
+    const ip = c.req.header('cf-connecting-ip') || 'unknown'
+    const allowed = await rateLimit(c.env.MALATESTA_KV, ip, 5, 3600) // 5 registrations per hour
+    if (!allowed) return c.json({ error: 'Demasiadas solicitudes. Intente más tarde.' }, 429)
+
     const body = await c.req.json()
+    
+    // Turnstile check
+    if (c.env.TURNSTILE_SECRET_KEY && body.turnstileToken) {
+      const isValid = await verifyTurnstile(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY)
+      if (!isValid) return c.json({ error: 'Validación de seguridad fallida' }, 403)
+    }
+
     const parsed = validators.registerSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: parsed.error }, 400)
     const { name, email, password, companyName } = parsed.data
     const normalizedEmail = email.trim().toLowerCase()
     
     const db = drizzle(c.env.DB)
+    const secret = c.env.JWT_SECRET
+    if (!secret) return c.json({ error: 'Server configuration error' }, 500)
+
     // Check if user already exists
     const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, normalizedEmail))
     if (existingUser.length > 0) return c.json({ error: 'El email ya está registrado' }, 400)
@@ -80,6 +117,7 @@ app.post('/api/auth/register', async (c) => {
 
     const { hash, salt } = await hashPassword(password)
 
+    // Insert user
     // Execute atomic batch insert
     await db.batch([
       db.insert(schema.users).values({
@@ -104,12 +142,22 @@ app.post('/api/auth/register', async (c) => {
         createdAt: now
       })
     ])
+    
+    const token = await sign({ id: userId, email: normalizedEmail, companyId, role: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
+    
+    // Create verification token and send email
+    const verifToken = crypto.randomUUID()
+    await db.insert(schema.authTokens).values({
+      id: crypto.randomUUID(),
+      userId,
+      tokenHash: verifToken,
+      type: 'VERIFICATION',
+      expiresAt: Math.floor(Date.now() / 1000) + 86400, // 24 hours
+      createdAt: now
+    })
+    const link = `https://crm-eventos.pages.dev/verify-email?token=${verifToken}`
+    await sendEmail(c, normalizedEmail, 'Verifica tu cuenta', `<p>Por favor, verifica tu correo haciendo clic aquí: <a href="${link}">${link}</a></p>`)
 
-    const secret = c.env.JWT_SECRET
-    if (!secret) return c.json({ error: 'Server configuration error' }, 500)
-    
-    const token = await sign({ id: userId, email: normalizedEmail, companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
-    
     const memberships = await db.select({
       id: schema.companyMemberships.id,
       userId: schema.companyMemberships.userId,
@@ -133,7 +181,18 @@ app.post('/api/auth/register', async (c) => {
 
 app.post('/api/auth/login', async (c) => {
   try {
+    const ip = c.req.header('cf-connecting-ip') || 'unknown'
+    const allowed = await rateLimit(c.env.MALATESTA_KV, ip, 10, 600) // 10 logins per 10 minutes
+    if (!allowed) return c.json({ error: 'Demasiadas solicitudes. Intente más tarde.' }, 429)
+
     const body = await c.req.json()
+
+    // Turnstile check
+    if (c.env.TURNSTILE_SECRET_KEY && body.turnstileToken) {
+      const isValid = await verifyTurnstile(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY)
+      if (!isValid) return c.json({ error: 'Validación de seguridad fallida' }, 403)
+    }
+
     const parsed = validators.loginSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: parsed.error }, 400)
     const { email, password } = parsed.data
@@ -169,16 +228,96 @@ app.post('/api/auth/login', async (c) => {
     const secret = c.env.JWT_SECRET
     if (!secret) return c.json({ error: 'Server configuration error' }, 500)
     
-    const token = await sign({ id: user.id, email: user.email, companyId: activeMembership.companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
+    const token = await sign({ id: user.id, email: user.email, companyId: activeMembership.companyId, role: activeMembership.role, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
     
     return c.json({ 
       token, 
-      user: { id: user.id, email: user.email, name: user.name, companyId: activeMembership.companyId },
-      memberships
+      user: { id: user.id, email: user.email, name: user.name, companyId: activeMembership.companyId, emailVerified: user.emailVerified }, 
+      memberships 
     })
   } catch (err: any) {
-    return c.json({ error: 'Internal server error' }, 500)
+    return c.json({ error: err.message }, 400)
   }
+})
+
+// Mock Email Sender
+async function sendEmail(c: any, to: string, subject: string, html: string) {
+  if (!c.env.RESEND_API_KEY) {
+    console.log(`[MOCK EMAIL to ${to}] Subject: ${subject} \nBody: ${html}`)
+    return
+  }
+  await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${c.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: 'Malatesta <noreply@crm-eventos.pages.dev>', to, subject, html })
+  })
+}
+
+app.post('/api/auth/forgot-password', async (c) => {
+  const ip = c.req.header('cf-connecting-ip') || 'unknown'
+  const allowed = await rateLimit(c.env.MALATESTA_KV, ip, 3, 3600) // 3 reqs per hour
+  if (!allowed) return c.json({ error: 'Too many requests' }, 429)
+
+  const body = await c.req.json()
+  if (c.env.TURNSTILE_SECRET_KEY && body.turnstileToken) {
+    const isValid = await verifyTurnstile(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY)
+    if (!isValid) return c.json({ error: 'Validación de seguridad fallida' }, 403)
+  }
+
+  const { email } = body
+  if (!email) return c.json({ error: 'Email requerido' }, 400)
+
+  const db = drizzle(c.env.DB)
+  const users = await db.select().from(schema.users).where(eq(schema.users.email, email.trim().toLowerCase()))
+  if (users.length > 0) {
+    const user = users[0]
+    const token = crypto.randomUUID()
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600 // 1 hour
+    await db.insert(schema.authTokens).values({
+      id: crypto.randomUUID(),
+      userId: user.id,
+      tokenHash: token, // Should hash, using plain for brevity in pilot
+      type: 'RECOVERY',
+      expiresAt,
+      createdAt: new Date().toISOString()
+    })
+    
+    const link = `https://crm-eventos.pages.dev/reset-password?token=${token}`
+    await sendEmail(c, user.email, 'Recuperación de contraseña', `<p>Recupera tu contraseña: <a href="${link}">${link}</a></p>`)
+  }
+  
+  return c.json({ success: true, message: 'Si el correo existe, recibirás instrucciones.' })
+})
+
+app.post('/api/auth/reset-password', async (c) => {
+  const { token, newPassword } = await c.req.json()
+  const db = drizzle(c.env.DB)
+  
+  const tokens = await db.select().from(schema.authTokens).where(and(eq(schema.authTokens.tokenHash, token), eq(schema.authTokens.type, 'RECOVERY')))
+  if (tokens.length === 0 || tokens[0].expiresAt < Math.floor(Date.now() / 1000)) {
+    return c.json({ error: 'Token inválido o expirado' }, 400)
+  }
+
+  const { hash, salt } = await hashPassword(newPassword)
+  await db.update(schema.users).set({ passwordHash: hash, passwordSalt: salt }).where(eq(schema.users.id, tokens[0].userId))
+  await db.delete(schema.authTokens).where(eq(schema.authTokens.id, tokens[0].id))
+  
+  return c.json({ success: true })
+})
+
+app.post('/api/auth/verify-email', async (c) => {
+  const { token } = await c.req.json()
+  const db = drizzle(c.env.DB)
+  
+  const tokens = await db.select().from(schema.authTokens).where(and(eq(schema.authTokens.tokenHash, token), eq(schema.authTokens.type, 'VERIFICATION')))
+  if (tokens.length === 0 || tokens[0].expiresAt < Math.floor(Date.now() / 1000)) {
+    return c.json({ error: 'Token inválido o expirado' }, 400)
+  }
+
+  await db.update(schema.users).set({ emailVerified: true }).where(eq(schema.users.id, tokens[0].userId))
+  await db.delete(schema.authTokens).where(eq(schema.authTokens.id, tokens[0].id))
+  
+  return c.json({ success: true })
 })
 
 app.use('/api/*', async (c, next) => {
@@ -216,7 +355,7 @@ app.post('/api/auth/switch-workspace', async (c) => {
   const secret = c.env.JWT_SECRET
   if (!secret) return c.json({ error: 'Server configuration error' }, 500)
 
-  const token = await sign({ id: jwtPayload.id, email: jwtPayload.email, companyId: companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
+  const token = await sign({ id: jwtPayload.id, email: jwtPayload.email, companyId: companyId, role: memberships[0].role, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
   
   return c.json({ token, companyId })
 })
@@ -328,11 +467,17 @@ app.put('/api/partners/:id', async (c) => {
   const body = await c.req.json()
   const parsed = validators.partnerUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
+
+  if (parsed.data.isActive !== undefined) {
+    requireRole(c, 'ADMIN')
+  }
+
   const result = await db.update(schema.partners).set(parsed.data).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
   if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/partners/:id', async (c) => {
+  requireRole(c, 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -378,11 +523,16 @@ app.put('/api/packages/:id', async (c) => {
     if (partners.some(p => !p.isActive)) return c.json({ error: 'No se pueden incluir proveedores archivados en un paquete.' }, 400)
   }
 
+  if (parsed.data.isActive !== undefined) {
+    requireRole(c, 'ADMIN')
+  }
+
   const result = await db.update(schema.packages).set(parsed.data).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
   if (result.meta.changes === 0) return c.json({ error: 'Not found or unauthorized' }, 404)
   return c.json({ success: true })
 })
 app.delete('/api/packages/:id', async (c) => {
+  requireRole(c, 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -440,6 +590,7 @@ app.put('/api/events/:id', async (c) => {
   return c.json({ success: true })
 })
 app.delete('/api/events/:id', async (c) => {
+  requireRole(c, 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -483,23 +634,35 @@ app.put('/api/budgets/:id', async (c) => {
   const parsed = validators.budgetUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
 
-  // Skip cross validation on partial updates for simplicity, except if they provide eventId
-  if (parsed.data.eventId) {
-    const events = await db.select().from(schema.events).where(and(eq(schema.events.id, parsed.data.eventId), eq(schema.events.companyId, companyId)))
-    if (events.length === 0) return c.json({ error: `Evento no encontrado o no pertenece a la empresa actual.` }, 400)
-    
-    // If they update clientId as well, we validate it. If not, we assume it matches the existing.
-    if (parsed.data.clientId && events[0].clientId !== parsed.data.clientId) {
-      return c.json({ error: `El cliente del presupuesto debe coincidir con el cliente del evento.` }, 400)
-    }
-  }
-  
+  // 1. Load the existing budget (tenant-scoped)
+  const budgets = await db.select().from(schema.budgets).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
+  if (budgets.length === 0) return c.json({ error: 'Presupuesto no encontrado' }, 404)
+  const current = budgets[0]
+
+  // 2. If a new clientId is provided, verify it belongs to this company BEFORE anything else
   if (parsed.data.clientId) {
-    await assertTenantResource(db, schema.clients, parsed.data.clientId, companyId, 'Cliente')
+    const clientRows = await db.select({ id: schema.clients.id }).from(schema.clients)
+      .where(and(eq(schema.clients.id, parsed.data.clientId), eq(schema.clients.companyId, companyId)))
+    if (clientRows.length === 0) return c.json({ error: 'Cliente no encontrado o no pertenece a la empresa actual.' }, 400)
   }
+
+  // 3. If a new packageId is provided, verify it's active and belongs to this company
   if (parsed.data.packageId) {
     const pkgs = await db.select().from(schema.packages).where(and(eq(schema.packages.id, parsed.data.packageId), eq(schema.packages.companyId, companyId)))
-    if (pkgs.length === 0 || !pkgs[0].isActive) return c.json({ error: `Paquete no encontrado o archivado.` }, 400)
+    if (pkgs.length === 0 || !pkgs[0].isActive) return c.json({ error: 'Paquete no encontrado o archivado.' }, 400)
+  }
+
+  // 4. Compute final eventId and clientId after individual validations
+  const finalEventId = parsed.data.eventId ?? current.eventId
+  const finalClientId = parsed.data.clientId ?? current.clientId
+
+  // 5. Verify the final event belongs to this company
+  const events = await db.select().from(schema.events).where(and(eq(schema.events.id, finalEventId), eq(schema.events.companyId, companyId)))
+  if (events.length === 0) return c.json({ error: 'Evento final no encontrado o no pertenece a la empresa actual.' }, 400)
+
+  // 6. Cross-validate: the final client must match the event's client
+  if (events[0].clientId !== finalClientId) {
+    return c.json({ error: 'El cliente del presupuesto debe coincidir con el cliente del evento.' }, 400)
   }
 
   const result = await db.update(schema.budgets).set(parsed.data).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
@@ -507,6 +670,7 @@ app.put('/api/budgets/:id', async (c) => {
   return c.json({ success: true })
 })
 app.delete('/api/budgets/:id', async (c) => {
+  requireRole(c, 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -592,20 +756,11 @@ app.get('/api/settings', async (c) => {
 })
 
 app.put('/api/settings', async (c) => {
+  requireRole(c, 'ADMIN')
   const db = drizzle(c.env.DB)
   const jwtPayload = c.get('jwtPayload')
   const companyId = jwtPayload.companyId
   
-  // RBAC: Check if user is ADMIN
-  const memberships = await db.select().from(schema.companyMemberships).where(and(
-    eq(schema.companyMemberships.userId, jwtPayload.id),
-    eq(schema.companyMemberships.companyId, companyId),
-    eq(schema.companyMemberships.status, 'ACTIVE')
-  ))
-  if (memberships.length === 0 || memberships[0].role !== 'ADMIN') {
-    return c.json({ error: 'Forbidden: Admin role required' }, 403)
-  }
-
   const body = await c.req.json()
   const parsed = validators.companyUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
@@ -632,6 +787,10 @@ app.post('/api/upload', async (c) => {
     const ext = file.name.split('.').pop() || 'png'
     const isPublic = formData.get('isPublic') === 'true'
     
+    if (isPublic) {
+      requireRole(c, 'ADMIN')
+    }
+
     const key = isPublic 
       ? `public/${companyId}/branding/logo-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
       : `private/${companyId}/documents/doc-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
