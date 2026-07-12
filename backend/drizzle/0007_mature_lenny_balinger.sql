@@ -1,0 +1,1 @@
+ALTER TABLE `packages` ADD `partner_ids` text NOT NULL;

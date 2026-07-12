@@ -1,0 +1,1 @@
+ALTER TABLE `events` RENAME COLUMN `budget_id` TO `accepted_budget_id`;

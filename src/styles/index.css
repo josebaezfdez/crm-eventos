@@ -1,0 +1,146 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-slate-50 text-slate-800 font-sans;
+  }
+  /* Números tabulares en métricas financieras */
+  .tnum {
+    font-variant-numeric: tabular-nums;
+  }
+  * {
+    @apply border-slate-200;
+  }
+  ::selection {
+    @apply bg-brand-200/60 text-brand-900;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white rounded-lg border border-slate-200 shadow-sm transition-all duration-200;
+  }
+  .card-hover {
+    @apply hover:shadow hover:border-slate-300 hover:-translate-y-[1px];
+  }
+  .input-base {
+    @apply w-full rounded-md border border-slate-300 bg-white px-2.5 py-1.5 text-sm text-slate-900 shadow-sm
+      placeholder:text-slate-400 transition-all duration-200
+      focus:border-brand-500 focus:outline-none focus:ring-[2px] focus:ring-brand-500/20
+      disabled:bg-slate-50 disabled:text-slate-400 disabled:shadow-none;
+  }
+  .label-base {
+    @apply mb-1 block text-[13px] font-medium text-slate-700;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium
+      transition-all duration-200 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-brand-600 text-white shadow-sm hover:bg-brand-700 hover:shadow;
+  }
+  .btn-secondary {
+    @apply btn border border-slate-200 bg-white text-slate-700 shadow-sm hover:bg-slate-50 hover:border-slate-300;
+  }
+  .btn-ghost {
+    @apply btn text-slate-500 hover:bg-slate-100 hover:text-slate-800;
+  }
+  .btn-danger {
+    @apply btn bg-red-50 text-red-600 hover:bg-red-100;
+  }
+  .btn-accent {
+    @apply btn bg-accent-500 text-white shadow-sm hover:bg-accent-600 hover:shadow;
+  }
+  /* Texto con degradado para titulares / números destacados */
+  .text-gradient {
+    @apply bg-gradient-to-br from-brand-600 via-brand-500 to-accent-500 bg-clip-text text-transparent;
+  }
+  .text-gradient-dark {
+    @apply bg-gradient-to-br from-slate-900 via-slate-800 to-brand-700 bg-clip-text text-transparent;
+  }
+  .icon-chip {
+    @apply flex h-8 w-8 items-center justify-center rounded-md;
+  }
+  .icon-chip-brand {
+    @apply icon-chip bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-200/50;
+  }
+  .icon-chip-accent {
+    @apply icon-chip bg-accent-50 text-accent-600 ring-1 ring-inset ring-accent-200/50;
+  }
+  .icon-chip-slate {
+    @apply icon-chip bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-200/50;
+  }
+  .bento {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 auto-rows-[minmax(120px,auto)];
+  }
+  .eyebrow {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+  }
+}
+
+/* Scrollbar sutil */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  background-clip: padding-box;
+  border: 2px solid transparent;
+}
+
+@media print {
+  @page {
+    margin: 0; /* Let the templates handle margins */
+  }
+  
+  html, body {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    background-color: white !important;
+  }
+  
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+  
+  /* Esconder elementos de la interfaz */
+  .no-print, nav, header, aside, .sidebar {
+    display: none !important;
+  }
+  
+  .print-page {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    background: white;
+    box-sizing: border-box;
+  }
+
+  /* Evitar que las filas se partan por la mitad */
+  tr, .avoid-break {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}

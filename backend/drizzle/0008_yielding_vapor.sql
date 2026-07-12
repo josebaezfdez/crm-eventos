@@ -1,0 +1,1 @@
+ALTER TABLE `packages` RENAME COLUMN `included_items` TO `custom_items`;
