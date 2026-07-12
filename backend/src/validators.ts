@@ -24,7 +24,8 @@ export const clientSchema = z.object({
   email: z.string().email().or(z.literal('')),
   phone: z.string(),
   company: z.string(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  createdAt: z.string().optional()
 });
 
 export const partnerSchema = z.object({
@@ -36,7 +37,8 @@ export const partnerSchema = z.object({
   fixedRate: z.number().min(0),
   notes: z.string().optional(),
   phone: z.string(),
-  email: z.string().email().or(z.literal(''))
+  email: z.string().email().or(z.literal('')),
+  createdAt: z.string().optional()
 });
 
 export const packageSchema = z.object({
@@ -48,7 +50,8 @@ export const packageSchema = z.object({
   recommendedPrice: z.number().min(0),
   partnerIds: z.array(z.string()),
   customItems: z.array(z.any()),
-  marginTarget: z.number()
+  marginTarget: z.number(),
+  createdAt: z.string().optional()
 });
 
 export const eventSchema = z.object({
@@ -62,7 +65,8 @@ export const eventSchema = z.object({
   durationHours: z.number().min(0),
   status: z.string(),
   acceptedBudgetId: z.string().nullable().optional(),
-  notes: z.string().optional()
+  notes: z.string().optional(),
+  createdAt: z.string().optional()
 });
 
 export const budgetSchema = z.object({
@@ -84,7 +88,8 @@ export const budgetSchema = z.object({
   vatPercentage: z.number(),
   expectedProfit: z.number(),
   expectedMarginPercentage: z.number(),
-  status: z.string()
+  status: z.string(),
+  createdAt: z.string().optional()
 });
 
 export const paymentSchema = z.object({
@@ -104,14 +109,17 @@ export const postEventResultSchema = z.object({
   notes: z.string().optional()
 });
 
-// Update schemas (Partial, strict, and requiring at least one field)
+// Update schemas: partial, omit id, require at least one field
 const createUpdateSchema = (schema: z.ZodObject<any, any>) => 
   schema.omit({ id: true })
     .partial()
-    .strict()
     .refine(data => Object.keys(data).length > 0, "Al menos un campo debe ser modificado");
 
-export const companyUpdateSchema = createUpdateSchema(companySchema);
+export const companyUpdateSchema = companySchema
+  .omit({ id: true })
+  .partial()
+  .refine(data => Object.keys(data).length > 0, "Al menos un campo debe ser modificado");
+
 export const clientUpdateSchema = createUpdateSchema(clientSchema);
 export const partnerUpdateSchema = createUpdateSchema(partnerSchema);
 export const packageUpdateSchema = createUpdateSchema(packageSchema);
@@ -121,6 +129,4 @@ export const paymentUpdateSchema = createUpdateSchema(paymentSchema);
 export const postEventResultUpdateSchema = postEventResultSchema
   .omit({ eventId: true })
   .partial()
-  .strict()
   .refine(data => Object.keys(data).length > 0, "Al menos un campo debe ser modificado");
-

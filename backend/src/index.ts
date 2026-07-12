@@ -150,14 +150,19 @@ app.get('/api/all', async (c) => {
 
 // --- CLIENTS ---
 app.post('/api/clients', async (c) => {
-  const db = drizzle(c.env.DB)
-  const body = await c.req.json()
-  const parsed = validators.clientSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  const data = parsed.data as any
-  data.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.clients).values(data)
-  return c.json({ success: true })
+  try {
+    const db = drizzle(c.env.DB)
+    const body = await c.req.json()
+    const parsed = validators.clientSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error }, 400)
+    const data = parsed.data as any
+    data.companyId = c.get('jwtPayload').companyId
+    if (!data.createdAt) data.createdAt = new Date().toISOString()
+    await db.insert(schema.clients).values(data)
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
 })
 app.put('/api/clients/:id', async (c) => {
   const db = drizzle(c.env.DB)
@@ -179,14 +184,19 @@ app.delete('/api/clients/:id', async (c) => {
 
 // --- PARTNERS ---
 app.post('/api/partners', async (c) => {
-  const db = drizzle(c.env.DB)
-  const body = await c.req.json()
-  const parsed = validators.partnerSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  const data = parsed.data as any
-  data.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.partners).values(data)
-  return c.json({ success: true })
+  try {
+    const db = drizzle(c.env.DB)
+    const body = await c.req.json()
+    const parsed = validators.partnerSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error }, 400)
+    const data = parsed.data as any
+    data.companyId = c.get('jwtPayload').companyId
+    if (!data.createdAt) data.createdAt = new Date().toISOString()
+    await db.insert(schema.partners).values(data)
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
 })
 app.put('/api/partners/:id', async (c) => {
   const db = drizzle(c.env.DB)
@@ -208,14 +218,19 @@ app.delete('/api/partners/:id', async (c) => {
 
 // --- PACKAGES ---
 app.post('/api/packages', async (c) => {
-  const db = drizzle(c.env.DB)
-  const body = await c.req.json()
-  const parsed = validators.packageSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  const data = parsed.data as any
-  data.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.packages).values(data)
-  return c.json({ success: true })
+  try {
+    const db = drizzle(c.env.DB)
+    const body = await c.req.json()
+    const parsed = validators.packageSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error }, 400)
+    const data = parsed.data as any
+    data.companyId = c.get('jwtPayload').companyId
+    if (!data.createdAt) data.createdAt = new Date().toISOString()
+    await db.insert(schema.packages).values(data)
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
 })
 app.put('/api/packages/:id', async (c) => {
   const db = drizzle(c.env.DB)
@@ -237,14 +252,19 @@ app.delete('/api/packages/:id', async (c) => {
 
 // --- EVENTS ---
 app.post('/api/events', async (c) => {
-  const db = drizzle(c.env.DB)
-  const body = await c.req.json()
-  const parsed = validators.eventSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  const data = parsed.data as any
-  data.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.events).values(data)
-  return c.json({ success: true })
+  try {
+    const db = drizzle(c.env.DB)
+    const body = await c.req.json()
+    const parsed = validators.eventSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error }, 400)
+    const data = parsed.data as any
+    data.companyId = c.get('jwtPayload').companyId
+    if (!data.createdAt) data.createdAt = new Date().toISOString()
+    await db.insert(schema.events).values(data)
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
 })
 app.put('/api/events/:id', async (c) => {
   const db = drizzle(c.env.DB)
@@ -266,14 +286,19 @@ app.delete('/api/events/:id', async (c) => {
 
 // --- BUDGETS ---
 app.post('/api/budgets', async (c) => {
-  const db = drizzle(c.env.DB)
-  const body = await c.req.json()
-  const parsed = validators.budgetSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  const data = parsed.data as any
-  data.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.budgets).values(data)
-  return c.json({ success: true })
+  try {
+    const db = drizzle(c.env.DB)
+    const body = await c.req.json()
+    const parsed = validators.budgetSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error }, 400)
+    const data = parsed.data as any
+    data.companyId = c.get('jwtPayload').companyId
+    if (!data.createdAt) data.createdAt = new Date().toISOString()
+    await db.insert(schema.budgets).values(data)
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
 })
 app.put('/api/budgets/:id', async (c) => {
   const db = drizzle(c.env.DB)
@@ -295,14 +320,18 @@ app.delete('/api/budgets/:id', async (c) => {
 
 // --- PAYMENTS ---
 app.post('/api/payments', async (c) => {
-  const db = drizzle(c.env.DB)
-  const body = await c.req.json()
-  const parsed = validators.paymentSchema.safeParse(body)
-  if (!parsed.success) return c.json({ error: parsed.error }, 400)
-  const data = parsed.data as any
-  data.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.payments).values(data)
-  return c.json({ success: true })
+  try {
+    const db = drizzle(c.env.DB)
+    const body = await c.req.json()
+    const parsed = validators.paymentSchema.safeParse(body)
+    if (!parsed.success) return c.json({ error: parsed.error }, 400)
+    const data = parsed.data as any
+    data.companyId = c.get('jwtPayload').companyId
+    await db.insert(schema.payments).values(data)
+    return c.json({ success: true })
+  } catch (err: any) {
+    return c.json({ error: err.message }, 500)
+  }
 })
 app.put('/api/payments/:id', async (c) => {
   const db = drizzle(c.env.DB)
