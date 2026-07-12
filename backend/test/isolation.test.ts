@@ -39,6 +39,12 @@ describe('Multi-tenant Isolation & Soft Delete', () => {
     // Generar JWTs con role ADMIN para no interferir con RBAC
     tokenA = await sign({ id: 'user_A', email: 'user@a.com', companyId: companyA, role: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
     tokenB = await sign({ id: 'user_B', email: 'user@b.com', companyId: companyB, role: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
+    
+    // Insert memberships so requireRole succeeds
+    await db.insert(schema.companyMemberships).values([
+      { id: 'mem_iso_A', userId: 'user_A', companyId: companyA, role: 'ADMIN', status: 'ACTIVE', createdAt: new Date().toISOString() },
+      { id: 'mem_iso_B', userId: 'user_B', companyId: companyB, role: 'ADMIN', status: 'ACTIVE', createdAt: new Date().toISOString() }
+    ]);
   })
 
   it('Empresa A no ve a los clientes de Empresa B', async () => {

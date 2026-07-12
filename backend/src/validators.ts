@@ -11,14 +11,16 @@ export const budgetItemCategoryEnum = z.enum(['Bebida', 'Comida', 'Hielo', 'Vaso
 
 export const loginSchema = z.object({
   email: z.string().email(),
-  password: z.string().min(1)
+  password: z.string().min(1),
+  turnstileToken: z.string().optional()
 }).strict();
 
 export const registerSchema = z.object({
   name: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  companyName: z.string().min(1)
+  companyName: z.string().min(1),
+  turnstileToken: z.string().optional()
 }).strict();
 
 export const companySchema = z.object({

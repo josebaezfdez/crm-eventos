@@ -6,7 +6,7 @@ import { eq, and, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import * as schema from './db/schema'
 import * as validators from './validators'
-import { assertTenantResource, assertTenantResources, requireRole } from './utils'
+import { assertTenantResource, assertTenantResources, requireRole, hashToken } from './utils'
 
 export type Env = {
   DB: D1Database
@@ -92,7 +92,10 @@ app.post('/api/auth/register', async (c) => {
     const body = await c.req.json()
     
     // Turnstile check
-    if (c.env.TURNSTILE_SECRET_KEY && body.turnstileToken) {
+    if (c.env.TURNSTILE_SECRET_KEY) {
+      if (!body.turnstileToken) {
+        return c.json({ error: 'Validación de seguridad requerida' }, 403)
+      }
       const isValid = await verifyTurnstile(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY)
       if (!isValid) return c.json({ error: 'Validación de seguridad fallida' }, 403)
     }
@@ -147,10 +150,11 @@ app.post('/api/auth/register', async (c) => {
     
     // Create verification token and send email
     const verifToken = crypto.randomUUID()
+    const hashedVerifToken = await hashToken(verifToken)
     await db.insert(schema.authTokens).values({
       id: crypto.randomUUID(),
       userId,
-      tokenHash: verifToken,
+      tokenHash: hashedVerifToken,
       type: 'VERIFICATION',
       expiresAt: Math.floor(Date.now() / 1000) + 86400, // 24 hours
       createdAt: now
@@ -188,7 +192,10 @@ app.post('/api/auth/login', async (c) => {
     const body = await c.req.json()
 
     // Turnstile check
-    if (c.env.TURNSTILE_SECRET_KEY && body.turnstileToken) {
+    if (c.env.TURNSTILE_SECRET_KEY) {
+      if (!body.turnstileToken) {
+        return c.json({ error: 'Validación de seguridad requerida' }, 403)
+      }
       const isValid = await verifyTurnstile(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY)
       if (!isValid) return c.json({ error: 'Validación de seguridad fallida' }, 403)
     }
@@ -249,7 +256,7 @@ async function sendEmail(c: any, to: string, subject: string, html: string) {
   await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${c.env.RESEND_API_KEY}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'Malatesta <noreply@crm-eventos.pages.dev>', to, subject, html })
+    body: JSON.stringify({ from: 'EventMargin <noreply@eventmargin.com>', to, subject, html })
   })
 }
 
@@ -259,7 +266,10 @@ app.post('/api/auth/forgot-password', async (c) => {
   if (!allowed) return c.json({ error: 'Too many requests' }, 429)
 
   const body = await c.req.json()
-  if (c.env.TURNSTILE_SECRET_KEY && body.turnstileToken) {
+  if (c.env.TURNSTILE_SECRET_KEY) {
+    if (!body.turnstileToken) {
+      return c.json({ error: 'Validación de seguridad requerida' }, 403)
+    }
     const isValid = await verifyTurnstile(body.turnstileToken, c.env.TURNSTILE_SECRET_KEY)
     if (!isValid) return c.json({ error: 'Validación de seguridad fallida' }, 403)
   }
@@ -272,11 +282,12 @@ app.post('/api/auth/forgot-password', async (c) => {
   if (users.length > 0) {
     const user = users[0]
     const token = crypto.randomUUID()
+    const hashedToken = await hashToken(token)
     const expiresAt = Math.floor(Date.now() / 1000) + 3600 // 1 hour
     await db.insert(schema.authTokens).values({
       id: crypto.randomUUID(),
       userId: user.id,
-      tokenHash: token, // Should hash, using plain for brevity in pilot
+      tokenHash: hashedToken,
       type: 'RECOVERY',
       expiresAt,
       createdAt: new Date().toISOString()
@@ -290,10 +301,15 @@ app.post('/api/auth/forgot-password', async (c) => {
 })
 
 app.post('/api/auth/reset-password', async (c) => {
-  const { token, newPassword } = await c.req.json()
+  const body = await c.req.json()
+  const parsed = z.object({ token: z.string(), newPassword: z.string().min(6) }).safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  
+  const { token, newPassword } = parsed.data
   const db = drizzle(c.env.DB)
   
-  const tokens = await db.select().from(schema.authTokens).where(and(eq(schema.authTokens.tokenHash, token), eq(schema.authTokens.type, 'RECOVERY')))
+  const hashedToken = await hashToken(token)
+  const tokens = await db.select().from(schema.authTokens).where(and(eq(schema.authTokens.tokenHash, hashedToken), eq(schema.authTokens.type, 'RECOVERY')))
   if (tokens.length === 0 || tokens[0].expiresAt < Math.floor(Date.now() / 1000)) {
     return c.json({ error: 'Token inválido o expirado' }, 400)
   }
@@ -309,7 +325,8 @@ app.post('/api/auth/verify-email', async (c) => {
   const { token } = await c.req.json()
   const db = drizzle(c.env.DB)
   
-  const tokens = await db.select().from(schema.authTokens).where(and(eq(schema.authTokens.tokenHash, token), eq(schema.authTokens.type, 'VERIFICATION')))
+  const hashedToken = await hashToken(token)
+  const tokens = await db.select().from(schema.authTokens).where(and(eq(schema.authTokens.tokenHash, hashedToken), eq(schema.authTokens.type, 'VERIFICATION')))
   if (tokens.length === 0 || tokens[0].expiresAt < Math.floor(Date.now() / 1000)) {
     return c.json({ error: 'Token inválido o expirado' }, 400)
   }
@@ -469,7 +486,7 @@ app.put('/api/partners/:id', async (c) => {
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
 
   if (parsed.data.isActive !== undefined) {
-    requireRole(c, 'ADMIN')
+    await requireRole(c, drizzle(c.env.DB), 'ADMIN')
   }
 
   const result = await db.update(schema.partners).set(parsed.data).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
@@ -477,7 +494,7 @@ app.put('/api/partners/:id', async (c) => {
   return c.json({ success: true })
 })
 app.delete('/api/partners/:id', async (c) => {
-  requireRole(c, 'ADMIN')
+  await requireRole(c, drizzle(c.env.DB), 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -524,7 +541,7 @@ app.put('/api/packages/:id', async (c) => {
   }
 
   if (parsed.data.isActive !== undefined) {
-    requireRole(c, 'ADMIN')
+    await requireRole(c, drizzle(c.env.DB), 'ADMIN')
   }
 
   const result = await db.update(schema.packages).set(parsed.data).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
@@ -532,7 +549,7 @@ app.put('/api/packages/:id', async (c) => {
   return c.json({ success: true })
 })
 app.delete('/api/packages/:id', async (c) => {
-  requireRole(c, 'ADMIN')
+  await requireRole(c, drizzle(c.env.DB), 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -590,7 +607,7 @@ app.put('/api/events/:id', async (c) => {
   return c.json({ success: true })
 })
 app.delete('/api/events/:id', async (c) => {
-  requireRole(c, 'ADMIN')
+  await requireRole(c, drizzle(c.env.DB), 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -670,7 +687,7 @@ app.put('/api/budgets/:id', async (c) => {
   return c.json({ success: true })
 })
 app.delete('/api/budgets/:id', async (c) => {
-  requireRole(c, 'ADMIN')
+  await requireRole(c, drizzle(c.env.DB), 'ADMIN')
   const db = drizzle(c.env.DB)
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
@@ -756,7 +773,7 @@ app.get('/api/settings', async (c) => {
 })
 
 app.put('/api/settings', async (c) => {
-  requireRole(c, 'ADMIN')
+  await requireRole(c, drizzle(c.env.DB), 'ADMIN')
   const db = drizzle(c.env.DB)
   const jwtPayload = c.get('jwtPayload')
   const companyId = jwtPayload.companyId
@@ -788,7 +805,7 @@ app.post('/api/upload', async (c) => {
     const isPublic = formData.get('isPublic') === 'true'
     
     if (isPublic) {
-      requireRole(c, 'ADMIN')
+      await requireRole(c, drizzle(c.env.DB), 'ADMIN')
     }
 
     const key = isPublic 

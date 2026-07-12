@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest'
 import app from '../src/index'
 import { getPlatformProxy } from 'wrangler'
 import { drizzle } from 'drizzle-orm/d1'
+import { eq } from 'drizzle-orm'
 import { sign } from 'hono/jwt'
 import * as schema from '../src/db/schema'
 
@@ -26,6 +27,11 @@ describe('RBAC (Role Based Access Control)', () => {
     const compId = 'comp-rbac';
     await db.insert(schema.companies).values({ id: compId, name: 'RBAC Co', createdAt: new Date().toISOString() });
     
+    await db.insert(schema.companyMemberships).values([
+      { id: 'mem_A', userId: 'uA', companyId: compId, role: 'ADMIN', status: 'ACTIVE', createdAt: new Date().toISOString() },
+      { id: 'mem_M', userId: 'uM', companyId: compId, role: 'MEMBER', status: 'ACTIVE', createdAt: new Date().toISOString() }
+    ]);
+
     // Generate tokens explicitly for test
     tokenAdmin = await sign({ id: 'uA', email: 'a@a', companyId: compId, role: 'ADMIN', exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
     tokenMember = await sign({ id: 'uM', email: 'm@m', companyId: compId, role: 'MEMBER', exp: Math.floor(Date.now() / 1000) + 3600 }, env.JWT_SECRET);
@@ -62,5 +68,21 @@ describe('RBAC (Role Based Access Control)', () => {
     expect(res.status).toBe(403);
     const data = await res.json() as any;
     expect(data.error).toContain('Forbidden');
+  });
+
+  it('revoca instantáneamente acceso de ADMIN si la membresía se altera en BD', async () => {
+    // Modify DB to demote uA to MEMBER
+    await db.update(schema.companyMemberships).set({ role: 'MEMBER' }).where(eq(schema.companyMemberships.userId, 'uA'));
+    
+    // Use the exact same tokenAdmin which has role: 'ADMIN' in payload
+    const req = new Request('http://localhost/api/settings', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenAdmin}` },
+      body: JSON.stringify({ name: 'New Name 2' })
+    });
+    const res = await app.request(req, {}, env);
+    expect(res.status).toBe(403); // Backend checks DB and sees MEMBER, so rejects
+    const data = await res.json() as any;
+    expect(data.error).toContain('revoked');
   });
 });
