@@ -85,7 +85,7 @@ interface AppState {
   reseed: () => Promise<void>
 }
 
-const BASE_URL = import.meta.env.PROD ? 'https://malatesta-api.josebaezfdez.workers.dev' : ''
+const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
 
 const getHeaders = () => {
   const token = useAuthStore.getState().token

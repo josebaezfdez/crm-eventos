@@ -10,7 +10,7 @@ import { ImageUpload } from '../components/ui/ImageUpload'
 import PartnersPage from './PartnersPage'
 import PackagesPage from './PackagesPage'
 
-const BASE_URL = import.meta.env.PROD ? 'https://malatesta-api.josebaezfdez.workers.dev' : ''
+const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
 
 export default function SettingsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
