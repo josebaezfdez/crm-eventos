@@ -9,6 +9,7 @@ import { create } from 'zustand'
 import type {
   Budget,
   Client,
+  Company,
   Event,
   EventStatus,
   Package,
@@ -39,6 +40,7 @@ interface AppState {
   budgets: Budget[]
   payments: Payment[]
   postEventResults: PostEventResult[]
+  settings: Company | null
 
   // Clientes
   addClient: (c: Omit<Client, 'id' | 'createdAt'>) => Promise<Client>
@@ -111,6 +113,7 @@ export const useStore = create<AppState>((set, get) => ({
   budgets: [],
   payments: [],
   postEventResults: [],
+  settings: null,
 
   // --- Clientes ---
   addClient: async (c) => {
@@ -257,29 +260,21 @@ export const useStore = create<AppState>((set, get) => ({
   // --- Sistema ---
   initApp: async () => {
     try {
-      const token = useAuthStore.getState().token
-      const res = await fetch(BASE_URL + '/api/all', {
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      const data = await api.get('/api/all')
+      set({
+        isInitialized: true,
+        settings: data.settings || null,
+        clients: data.clients || [],
+        partners: data.partners || [],
+        packages: data.packages || [],
+        events: data.events || [],
+        budgets: data.budgets || [],
+        payments: data.payments || [],
+        postEventResults: data.postEventResults || [],
       })
-      if (res.ok) {
-        const data = await res.json()
-        set({
-          clients: data.clients || [],
-          partners: data.partners || [],
-          packages: data.packages || [],
-          events: data.events || [],
-          budgets: data.budgets || [],
-          payments: data.payments || [],
-          postEventResults: data.postEventResults || [],
-          isInitialized: true
-        })
-      } else {
-        console.error("Failed to load initial data")
-        set({ isInitialized: true })
-      }
     } catch (e) {
       console.error("Error connecting to backend", e)
-      set({ isInitialized: true }) // permitimos renderizar aunque falle para no bloquear la UI
+      set({ isInitialized: true })
     }
   },
   resetDemo: async () => {

@@ -1,9 +1,9 @@
 {
-  "name": "malatesta-events",
+  "name": "eventmargin",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Malatesta Events - Herramienta de gestión de eventos",
+  "description": "EventMargin - SaaS de presupuestación y rentabilidad para eventos",
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",

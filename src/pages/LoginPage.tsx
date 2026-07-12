@@ -5,7 +5,7 @@ import { Input } from '../components/ui/Input'
 import { useAuthStore } from '../store/useAuthStore'
 import { Lock, Mail, Loader2 } from 'lucide-react'
 
-const BASE_URL = import.meta.env.PROD ? 'https://malatesta-api.josebaezfdez.workers.dev' : ''
+const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
 
 export function LoginPage() {
   const login = useAuthStore(s => s.login)
@@ -46,8 +46,8 @@ export function LoginPage() {
           <div className="mx-auto w-16 h-16 bg-zinc-900 rounded-2xl flex items-center justify-center mb-4">
             <Lock className="text-white w-8 h-8" />
           </div>
-          <CardTitle className="text-2xl mb-2">Pub Malatesta</CardTitle>
-          <CardSubtitle>CRM Privado · Acceso Restringido</CardSubtitle>
+          <CardTitle className="text-2xl mb-2">EventMargin</CardTitle>
+          <CardSubtitle>Acceso a tu cuenta</CardSubtitle>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -67,7 +67,7 @@ export function LoginPage() {
                   value={email} 
                   onChange={e => setEmail(e.target.value)} 
                   className="pl-10" 
-                  placeholder="admin@malatesta.es"
+                  placeholder="tu@email.com"
                   required 
                 />
               </div>

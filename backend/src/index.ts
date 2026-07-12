@@ -3,7 +3,9 @@ import { cors } from 'hono/cors'
 import { jwt, sign } from 'hono/jwt'
 import { drizzle } from 'drizzle-orm/d1'
 import { eq, and } from 'drizzle-orm'
+import { z } from 'zod'
 import * as schema from './db/schema'
+import * as validators from './validators'
 
 export type Env = {
   DB: D1Database
@@ -11,16 +13,48 @@ export type Env = {
   JWT_SECRET: string
 }
 
-const app = new Hono<{ Bindings: Env }>()
+type Variables = {
+  jwtPayload: { id: string; email: string; companyId: string; exp: number }
+}
+
+const app = new Hono<{ Bindings: Env; Variables: Variables }>()
 
 app.use('/api/*', cors())
 
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder()
-  const data = encoder.encode(password + 'malatesta_salt')
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data)
-  const hashArray = Array.from(new Uint8Array(hashBuffer))
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+async function hashPassword(password: string, providedSalt?: string): Promise<{ hash: string, salt: string }> {
+  const enc = new TextEncoder();
+  
+  let saltArray: Uint8Array;
+  if (providedSalt) {
+    saltArray = new Uint8Array(providedSalt.match(/.{1,2}/g)!.map(byte => parseInt(byte, 16)));
+  } else {
+    saltArray = crypto.getRandomValues(new Uint8Array(16));
+  }
+  
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw",
+    enc.encode(password),
+    "PBKDF2",
+    false,
+    ["deriveBits"]
+  );
+
+  const hashBuffer = await crypto.subtle.deriveBits(
+    {
+      name: "PBKDF2",
+      salt: saltArray,
+      iterations: 100000,
+      hash: "SHA-256",
+    },
+    keyMaterial,
+    256
+  );
+
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  const saltHex = Array.from(saltArray).map(b => b.toString(16).padStart(2, '0')).join('');
+  
+  return { hash: hashHex, salt: saltHex };
 }
 
 app.post('/api/auth/login', async (c) => {
@@ -31,22 +65,26 @@ app.post('/api/auth/login', async (c) => {
   const user = users[0]
   if (!user) return c.json({ error: 'User not found' }, 401)
   
-  const hashed = await hashPassword(password)
-  if (user.passwordHash !== hashed) {
+  const { hash } = await hashPassword(password, user.passwordSalt)
+  if (user.passwordHash !== hash) {
     return c.json({ error: 'Invalid password' }, 401)
   }
 
-  const secret = c.env.JWT_SECRET || 'fallback_secret_for_dev_12345'
+  const secret = c.env.JWT_SECRET
+  if (!secret) throw new Error("JWT_SECRET is not configured")
+  
   const token = await sign({ id: user.id, email: user.email, companyId: user.companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
   
   return c.json({ token, user: { id: user.id, email: user.email, name: user.name, companyId: user.companyId } })
 })
 
 app.use('/api/*', async (c, next) => {
-  if (c.req.path === '/api/auth/login' || c.req.path === '/api/health' || c.req.path === '/api/seed' || c.req.path.startsWith('/api/assets/')) {
+  if (c.req.path === '/api/auth/login' || c.req.path === '/api/health' || c.req.path.startsWith('/api/assets/')) {
     return next()
   }
-  const secret = c.env.JWT_SECRET || 'fallback_secret_for_dev_12345'
+  const secret = c.env.JWT_SECRET
+  if (!secret) throw new Error("JWT_SECRET is not configured")
+  
   const jwtMiddleware = jwt({ secret, alg: 'HS256' })
   return jwtMiddleware(c, next)
 })
@@ -65,6 +103,7 @@ app.get('/api/all', async (c) => {
     budgets,
     payments,
     postEventResults,
+    companies,
   ] = await Promise.all([
     db.select().from(schema.clients).where(eq(schema.clients.companyId, companyId)),
     db.select().from(schema.partners).where(eq(schema.partners.companyId, companyId)),
@@ -73,6 +112,7 @@ app.get('/api/all', async (c) => {
     db.select().from(schema.budgets).where(eq(schema.budgets.companyId, companyId)),
     db.select().from(schema.payments).where(eq(schema.payments.companyId, companyId)),
     db.select().from(schema.postEventResults).where(eq(schema.postEventResults.companyId, companyId)),
+    db.select().from(schema.companies).where(eq(schema.companies.id, companyId)),
   ])
   
   // Parse JSON fields
@@ -86,6 +126,7 @@ app.get('/api/all', async (c) => {
   }
 
   return c.json({
+    settings: companies[0] || {},
     clients,
     partners,
     packages: packages.map(p => parseJson(p, ['partnerIds', 'customItems'])),
@@ -96,57 +137,17 @@ app.get('/api/all', async (c) => {
   })
 })
 
-// --- SEED (Para resetDemo) ---
-app.post('/api/seed', async (c) => {
-  const db = drizzle(c.env.DB)
-  const body = await c.req.json()
-  
-  // Limpiar todas las tablas
-  await db.delete(schema.users)
-  await db.delete(schema.companies)
-  await db.delete(schema.clients)
-  await db.delete(schema.partners)
-  await db.delete(schema.packages)
-  await db.delete(schema.events)
-  await db.delete(schema.budgets)
-  await db.delete(schema.payments)
-  await db.delete(schema.postEventResults)
 
-  await db.insert(schema.companies).values({
-    id: 'c_default',
-    name: 'Pub Malatesta',
-    email: 'contacto@malatesta.es',
-    createdAt: new Date().toISOString()
-  })
-
-  const adminPass = await hashPassword('Malatesta*2026*')
-  await db.insert(schema.users).values({
-    id: 'u_admin',
-    companyId: 'c_default',
-    email: 'admin@malatesta.es',
-    passwordHash: adminPass,
-    name: 'Administrador',
-    createdAt: new Date().toISOString()
-  })
-
-  // Insertar
-  if (body.clients?.length) await db.insert(schema.clients).values(body.clients.map((i: any) => ({ ...i, companyId: 'c_default' })))
-  if (body.partners?.length) await db.insert(schema.partners).values(body.partners.map((i: any) => ({ ...i, companyId: 'c_default' })))
-  if (body.packages?.length) await db.insert(schema.packages).values(body.packages.map((i: any) => ({ ...i, companyId: 'c_default' })))
-  if (body.events?.length) await db.insert(schema.events).values(body.events.map((i: any) => ({ ...i, companyId: 'c_default' })))
-  if (body.budgets?.length) await db.insert(schema.budgets).values(body.budgets.map((i: any) => ({ ...i, companyId: 'c_default' })))
-  if (body.payments?.length) await db.insert(schema.payments).values(body.payments.map((i: any) => ({ ...i, companyId: 'c_default' })))
-  if (body.postEventResults?.length) await db.insert(schema.postEventResults).values(body.postEventResults.map((i: any) => ({ ...i, companyId: 'c_default' })))
-
-  return c.json({ success: true })
-})
 
 // --- CLIENTS ---
 app.post('/api/clients', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
-  body.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.clients).values(body)
+  const parsed = validators.clientSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const data = parsed.data as any
+  data.companyId = c.get('jwtPayload').companyId
+  await db.insert(schema.clients).values(data)
   return c.json({ success: true })
 })
 app.put('/api/clients/:id', async (c) => {
@@ -154,7 +155,9 @@ app.put('/api/clients/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  await db.update(schema.clients).set(body).where(and(eq(schema.clients.id, id), eq(schema.clients.companyId, companyId)))
+  const parsed = validators.clientSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  await db.update(schema.clients).set(parsed.data).where(and(eq(schema.clients.id, id), eq(schema.clients.companyId, companyId)))
   return c.json({ success: true })
 })
 app.delete('/api/clients/:id', async (c) => {
@@ -169,8 +172,11 @@ app.delete('/api/clients/:id', async (c) => {
 app.post('/api/partners', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
-  body.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.partners).values(body)
+  const parsed = validators.partnerSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const data = parsed.data as any
+  data.companyId = c.get('jwtPayload').companyId
+  await db.insert(schema.partners).values(data)
   return c.json({ success: true })
 })
 app.put('/api/partners/:id', async (c) => {
@@ -178,7 +184,9 @@ app.put('/api/partners/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  await db.update(schema.partners).set(body).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
+  const parsed = validators.partnerSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  await db.update(schema.partners).set(parsed.data).where(and(eq(schema.partners.id, id), eq(schema.partners.companyId, companyId)))
   return c.json({ success: true })
 })
 app.delete('/api/partners/:id', async (c) => {
@@ -193,8 +201,11 @@ app.delete('/api/partners/:id', async (c) => {
 app.post('/api/packages', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
-  body.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.packages).values(body)
+  const parsed = validators.packageSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const data = parsed.data as any
+  data.companyId = c.get('jwtPayload').companyId
+  await db.insert(schema.packages).values(data)
   return c.json({ success: true })
 })
 app.put('/api/packages/:id', async (c) => {
@@ -202,7 +213,9 @@ app.put('/api/packages/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  await db.update(schema.packages).set(body).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
+  const parsed = validators.packageSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  await db.update(schema.packages).set(parsed.data).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
   return c.json({ success: true })
 })
 app.delete('/api/packages/:id', async (c) => {
@@ -217,8 +230,11 @@ app.delete('/api/packages/:id', async (c) => {
 app.post('/api/events', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
-  body.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.events).values(body)
+  const parsed = validators.eventSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const data = parsed.data as any
+  data.companyId = c.get('jwtPayload').companyId
+  await db.insert(schema.events).values(data)
   return c.json({ success: true })
 })
 app.put('/api/events/:id', async (c) => {
@@ -226,7 +242,9 @@ app.put('/api/events/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  await db.update(schema.events).set(body).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
+  const parsed = validators.eventSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  await db.update(schema.events).set(parsed.data).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
   return c.json({ success: true })
 })
 app.delete('/api/events/:id', async (c) => {
@@ -241,8 +259,11 @@ app.delete('/api/events/:id', async (c) => {
 app.post('/api/budgets', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
-  body.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.budgets).values(body)
+  const parsed = validators.budgetSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const data = parsed.data as any
+  data.companyId = c.get('jwtPayload').companyId
+  await db.insert(schema.budgets).values(data)
   return c.json({ success: true })
 })
 app.put('/api/budgets/:id', async (c) => {
@@ -250,7 +271,9 @@ app.put('/api/budgets/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  await db.update(schema.budgets).set(body).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
+  const parsed = validators.budgetSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  await db.update(schema.budgets).set(parsed.data).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
   return c.json({ success: true })
 })
 app.delete('/api/budgets/:id', async (c) => {
@@ -265,8 +288,11 @@ app.delete('/api/budgets/:id', async (c) => {
 app.post('/api/payments', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
-  body.companyId = c.get('jwtPayload').companyId
-  await db.insert(schema.payments).values(body)
+  const parsed = validators.paymentSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const data = parsed.data as any
+  data.companyId = c.get('jwtPayload').companyId
+  await db.insert(schema.payments).values(data)
   return c.json({ success: true })
 })
 app.put('/api/payments/:id', async (c) => {
@@ -274,7 +300,9 @@ app.put('/api/payments/:id', async (c) => {
   const id = c.req.param('id')
   const companyId = c.get('jwtPayload').companyId
   const body = await c.req.json()
-  await db.update(schema.payments).set(body).where(and(eq(schema.payments.id, id), eq(schema.payments.companyId, companyId)))
+  const parsed = validators.paymentSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  await db.update(schema.payments).set(parsed.data).where(and(eq(schema.payments.id, id), eq(schema.payments.companyId, companyId)))
   return c.json({ success: true })
 })
 app.delete('/api/payments/:id', async (c) => {
@@ -289,13 +317,16 @@ app.delete('/api/payments/:id', async (c) => {
 app.post('/api/postEventResults', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
-  body.companyId = c.get('jwtPayload').companyId
+  const parsed = validators.postEventResultSchema.safeParse(body)
+  if (!parsed.success) return c.json({ error: parsed.error }, 400)
+  const data = parsed.data as any
+  data.companyId = c.get('jwtPayload').companyId
   
-  const existing = await db.select().from(schema.postEventResults).where(and(eq(schema.postEventResults.eventId, body.eventId), eq(schema.postEventResults.companyId, body.companyId)))
+  const existing = await db.select().from(schema.postEventResults).where(and(eq(schema.postEventResults.eventId, data.eventId), eq(schema.postEventResults.companyId, data.companyId)))
   if (existing.length > 0) {
-    await db.update(schema.postEventResults).set(body).where(and(eq(schema.postEventResults.eventId, body.eventId), eq(schema.postEventResults.companyId, body.companyId)))
+    await db.update(schema.postEventResults).set(data).where(and(eq(schema.postEventResults.eventId, data.eventId), eq(schema.postEventResults.companyId, data.companyId)))
   } else {
-    await db.insert(schema.postEventResults).values(body)
+    await db.insert(schema.postEventResults).values(data)
   }
   return c.json({ success: true })
 })
@@ -331,7 +362,7 @@ app.put('/api/settings', async (c) => {
 app.post('/api/upload', async (c) => {
   try {
     const formData = await c.req.formData()
-    const file = formData.get('file') as File
+    const file = formData.get('file') as unknown as File
     if (!file) return c.json({ error: 'No file provided' }, 400)
     
     // Generate simple unique ID

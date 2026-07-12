@@ -19,6 +19,7 @@ export const users = sqliteTable('users', {
   companyId: text('company_id').notNull(),
   email: text('email').notNull().unique(),
   passwordHash: text('password_hash').notNull(),
+  passwordSalt: text('password_salt').notNull(),
   name: text('name').notNull(),
   createdAt: text('created_at').notNull(),
 });

@@ -12,7 +12,6 @@ import BudgetWizardPage from './pages/BudgetWizardPage'
 import BudgetViewPage from './pages/BudgetViewPage'
 import BudgetsListPage from './pages/BudgetsListPage'
 import ClientsPage from './pages/ClientsPage'
-import InvoicesPage from './pages/InvoicesPage'
 import PostEventPage from './pages/PostEventPage'
 import SettingsPage from './pages/SettingsPage'
 import HelpPage from './pages/HelpPage'
@@ -56,7 +55,6 @@ export default function App() {
         <Route path="/budgets/:id/edit" element={<BudgetWizardPage />} />
         <Route path="/budgets/:id/pdf" element={<BudgetPdfPreview />} />
         <Route path="/budgets/:id" element={<BudgetViewPage />} />
-        <Route path="/invoices" element={<InvoicesPage />} />
         <Route path="/clients" element={<ClientsPage />} />
         <Route path="/settings" element={<SettingsPage />} />
         <Route path="/help" element={<HelpPage />} />

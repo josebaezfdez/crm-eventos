@@ -68,7 +68,7 @@ Toda la matemática vive en `src/utils/marginCalculator.ts`:
    de precio de +10%, +20% y +30%. Cada escenario muestra precio, coste,
    beneficio, margen y recomendación textual.
 
-### Datos mock (demo "Malatesta", coctelería móvil)
+### Datos mock (demo "EventMargin", coctelería móvil)
 
 Cargados automáticamente la primera vez:
 

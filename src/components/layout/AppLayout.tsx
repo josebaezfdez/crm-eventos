@@ -66,7 +66,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex flex-1 items-center gap-2">
             <span className="hidden text-[13px] font-medium text-slate-400 sm:inline">
-              Malatesta Events
+              EventMargin
             </span>
             <span className="hidden text-slate-300 sm:inline">/</span>
             <span className="hidden text-[13px] font-semibold text-slate-700 sm:inline">CRM Dashboard</span>

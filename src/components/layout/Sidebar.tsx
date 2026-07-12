@@ -5,7 +5,6 @@ import {
   CalendarDays,
   Users,
   Receipt,
-  FileText,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useAuthStore } from '../../store/useAuthStore'
@@ -22,17 +21,16 @@ const navItems: NavItem[] = [
   { to: '/clients', label: 'Clientes', icon: Users },
   { to: '/events', label: 'Eventos', icon: CalendarDays },
   { to: '/budgets', label: 'Presupuestos', icon: Receipt },
-  { to: '/invoices', label: 'Facturas', icon: FileText },
 ]
 
 export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const token = useAuthStore(s => s.token)
   const [logoUrl, setLogoUrl] = useState('')
-  const [companyName, setCompanyName] = useState('Malatesta Events')
+  const [companyName, setCompanyName] = useState('EventMargin')
 
   useEffect(() => {
     if (!token) return
-    const BASE_URL = import.meta.env.PROD ? 'https://malatesta-api.josebaezfdez.workers.dev' : ''
+    const BASE_URL = import.meta.env.PROD ? 'https://eventmargin-api.josebaezfdez.workers.dev' : ''
     fetch(BASE_URL + '/api/settings', {
       headers: { 'Authorization': `Bearer ${token}` }
     })

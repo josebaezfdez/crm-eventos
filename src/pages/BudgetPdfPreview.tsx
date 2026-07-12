@@ -1,16 +1,17 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useBudget, useClient, useEvent } from '../hooks/useSelectors'
+import { useStore as useAppStore } from '../store/useStore'
 import { Button } from '../components/ui/Button'
 import { ArrowLeft, Printer, LayoutTemplate } from 'lucide-react'
 import { TemplateClassic } from '../components/budgets/templates/TemplateClassic'
 import { TemplateModern } from '../components/budgets/templates/TemplateModern'
 import { TemplateBold } from '../components/budgets/templates/TemplateBold'
 
-const BUSINESS = {
-  name: 'Malatesta',
-  tagline: 'Coctelería de autor para eventos',
-  email: 'hola@malatesta.es',
+const DEFAULT_BUSINESS = {
+  name: 'EventMargin',
+  tagline: 'SaaS de Presupuestación',
+  email: 'hola@eventmargin.com',
   phone: '+34 600 00 00 00',
 }
 
@@ -22,6 +23,15 @@ export default function BudgetPdfPreview() {
   const budget = useBudget(id)
   const event = useEvent(budget?.eventId)
   const client = useClient(budget?.clientId)
+  const settings = useAppStore((s) => s.settings)
+
+  const business = {
+    name: settings?.name || DEFAULT_BUSINESS.name,
+    tagline: settings?.email ? '' : DEFAULT_BUSINESS.tagline,
+    email: settings?.email || DEFAULT_BUSINESS.email,
+    phone: settings?.phone || DEFAULT_BUSINESS.phone,
+    logoUrl: settings?.logoUrl,
+  }
 
   const [template, setTemplate] = useState<TemplateType>('classic')
 
@@ -84,13 +94,13 @@ export default function BudgetPdfPreview() {
         {/* Envoltorio simulando el papel A4 en pantalla */}
         <div className="bg-white shadow-xl max-w-[210mm] w-full mx-auto print:shadow-none print:max-w-none print:w-full print:mx-0">
           {template === 'classic' && (
-            <TemplateClassic budget={budget} client={client} event={event} business={BUSINESS} />
+            <TemplateClassic budget={budget} client={client} event={event} business={business} />
           )}
           {template === 'modern' && (
-            <TemplateModern budget={budget} client={client} event={event} business={BUSINESS} />
+            <TemplateModern budget={budget} client={client} event={event} business={business} />
           )}
           {template === 'bold' && (
-            <TemplateBold budget={budget} client={client} event={event} business={BUSINESS} />
+            <TemplateBold budget={budget} client={client} event={event} business={business} />
           )}
         </div>
       </div>

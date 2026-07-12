@@ -11,10 +11,10 @@ import { useStore as useAppStore } from '../store/useStore'
 import { formatCurrency, formatDate, formatDateLong } from '../utils/format'
 import { ArrowLeft, FileDown, Send, Receipt, Eye, ShieldCheck, Edit3, Trash2 } from 'lucide-react'
 
-const BUSINESS = {
-  name: 'Malatesta · Coctelería móvil',
-  tagline: 'Coctelería de autor para eventos',
-  email: 'hola@malatesta.es',
+const DEFAULT_BUSINESS = {
+  name: 'EventMargin',
+  tagline: 'SaaS de Presupuestación',
+  email: 'hola@eventmargin.com',
   phone: '+34 600 00 00 00',
 }
 
@@ -35,6 +35,14 @@ export default function BudgetViewPage() {
   const client = useClient(budget?.clientId)
   const updateBudget = useAppStore((s) => s.updateBudget)
   const deleteBudget = useAppStore((s) => s.deleteBudget)
+  const settings = useAppStore((s) => s.settings)
+
+  const business = {
+    name: settings?.name || DEFAULT_BUSINESS.name,
+    tagline: settings?.email ? '' : DEFAULT_BUSINESS.tagline,
+    email: settings?.email || DEFAULT_BUSINESS.email,
+    phone: settings?.phone || DEFAULT_BUSINESS.phone,
+  }
 
   const [confirmOpen, setConfirmOpen] = useState(false)
 
@@ -81,15 +89,19 @@ export default function BudgetViewPage() {
         <div className="flex flex-col gap-4 border-b border-slate-100 p-6 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-accent-500 text-white shadow-glow">
-                <span className="text-base font-bold">M</span>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-accent-500 text-white shadow-glow overflow-hidden">
+                {settings?.logoUrl ? (
+                  <img src={settings.logoUrl} alt={business.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-base font-bold">{business.name.charAt(0).toUpperCase()}</span>
+                )}
               </div>
               <div>
-                <p className="text-base font-bold tracking-tight text-slate-900">{BUSINESS.name}</p>
-                <p className="text-xs text-slate-400">{BUSINESS.tagline}</p>
+                <p className="text-base font-bold tracking-tight text-slate-900">{business.name}</p>
+                {business.tagline && <p className="text-xs text-slate-400">{business.tagline}</p>}
               </div>
             </div>
-            <p className="mt-3 text-xs text-slate-400">{BUSINESS.email} · {BUSINESS.phone}</p>
+            <p className="mt-3 text-xs text-slate-400">{business.email} · {business.phone}</p>
           </div>
           <div className="text-left sm:text-right">
             <p className="text-xs uppercase tracking-wider text-slate-400">Presupuesto</p>
