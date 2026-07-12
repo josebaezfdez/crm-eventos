@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { cors } from 'hono/cors'
 import { jwt, sign } from 'hono/jwt'
 import { drizzle } from 'drizzle-orm/d1'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, inArray } from 'drizzle-orm'
 import { z } from 'zod'
 import * as schema from './db/schema'
 import * as validators from './validators'
@@ -66,56 +66,64 @@ app.post('/api/auth/register', async (c) => {
     const parsed = validators.registerSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: parsed.error }, 400)
     const { name, email, password, companyName } = parsed.data
+    const normalizedEmail = email.trim().toLowerCase()
     
     const db = drizzle(c.env.DB)
     // Check if user already exists
-    const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, email))
+    const existingUser = await db.select().from(schema.users).where(eq(schema.users.email, normalizedEmail))
     if (existingUser.length > 0) return c.json({ error: 'El email ya está registrado' }, 400)
 
-    const userId = `user_${Date.now()}`
-    const companyId = `company_${Date.now()}`
-    const membershipId = `mem_${Date.now()}`
+    const userId = `user_${crypto.randomUUID()}`
+    const companyId = `company_${crypto.randomUUID()}`
+    const membershipId = `mem_${crypto.randomUUID()}`
     const now = new Date().toISOString()
 
     const { hash, salt } = await hashPassword(password)
 
-    // Insert user
-    await db.insert(schema.users).values({
-      id: userId,
-      email,
-      passwordHash: hash,
-      passwordSalt: salt,
-      name,
-      createdAt: now
-    })
-
-    // Insert company
-    await db.insert(schema.companies).values({
-      id: companyId,
-      name: companyName,
-      createdAt: now
-    })
-
-    // Insert membership
-    await db.insert(schema.companyMemberships).values({
-      id: membershipId,
-      userId,
-      companyId,
-      role: 'ADMIN',
-      status: 'ACTIVE',
-      createdAt: now
-    })
+    // Execute atomic batch insert
+    await db.batch([
+      db.insert(schema.users).values({
+        id: userId,
+        email: normalizedEmail,
+        passwordHash: hash,
+        passwordSalt: salt,
+        name,
+        createdAt: now
+      }),
+      db.insert(schema.companies).values({
+        id: companyId,
+        name: companyName,
+        createdAt: now
+      }),
+      db.insert(schema.companyMemberships).values({
+        id: membershipId,
+        userId,
+        companyId,
+        role: 'ADMIN',
+        status: 'ACTIVE',
+        createdAt: now
+      })
+    ])
 
     const secret = c.env.JWT_SECRET
     if (!secret) return c.json({ error: 'Server configuration error' }, 500)
     
-    const token = await sign({ id: userId, email, companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
+    const token = await sign({ id: userId, email: normalizedEmail, companyId, exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 7 }, secret)
     
-    const memberships = await db.select().from(schema.companyMemberships).where(eq(schema.companyMemberships.userId, userId))
+    const memberships = await db.select({
+      id: schema.companyMemberships.id,
+      userId: schema.companyMemberships.userId,
+      companyId: schema.companyMemberships.companyId,
+      role: schema.companyMemberships.role,
+      status: schema.companyMemberships.status,
+      companyName: schema.companies.name
+    }).from(schema.companyMemberships)
+      .innerJoin(schema.companies, eq(schema.companyMemberships.companyId, schema.companies.id))
+      .where(and(eq(schema.companyMemberships.userId, userId), eq(schema.companyMemberships.status, 'ACTIVE')))
 
     return c.json({ 
       token, 
-      user: { id: userId, email, name, companyId },
+      user: { id: userId, email: normalizedEmail, name, companyId },
       memberships
     })
   } catch (err: any) {
@@ -129,8 +137,10 @@ app.post('/api/auth/login', async (c) => {
     const parsed = validators.loginSchema.safeParse(body)
     if (!parsed.success) return c.json({ error: parsed.error }, 400)
     const { email, password } = parsed.data
+    const normalizedEmail = email.trim().toLowerCase()
+
     const db = drizzle(c.env.DB)
-    const users = await db.select().from(schema.users).where(eq(schema.users.email, email))
+    const users = await db.select().from(schema.users).where(eq(schema.users.email, normalizedEmail))
     
     const user = users[0]
     if (!user) return c.json({ error: 'User not found' }, 401)
@@ -140,7 +150,17 @@ app.post('/api/auth/login', async (c) => {
       return c.json({ error: 'Invalid password' }, 401)
     }
 
-    const memberships = await db.select().from(schema.companyMemberships).where(eq(schema.companyMemberships.userId, user.id))
+    const memberships = await db.select({
+      id: schema.companyMemberships.id,
+      userId: schema.companyMemberships.userId,
+      companyId: schema.companyMemberships.companyId,
+      role: schema.companyMemberships.role,
+      status: schema.companyMemberships.status,
+      companyName: schema.companies.name
+    }).from(schema.companyMemberships)
+      .innerJoin(schema.companies, eq(schema.companyMemberships.companyId, schema.companies.id))
+      .where(and(eq(schema.companyMemberships.userId, user.id), eq(schema.companyMemberships.status, 'ACTIVE')))
+
     if (memberships.length === 0) {
       return c.json({ error: 'User has no active memberships' }, 403)
     }
@@ -161,6 +181,19 @@ app.post('/api/auth/login', async (c) => {
   }
 })
 
+app.use('/api/*', async (c, next) => {
+  if (c.req.path === '/api/auth/login' || c.req.path === '/api/auth/register' || c.req.path === '/api/health' || c.req.path.startsWith('/api/assets/public/')) {
+    return next()
+  }
+  const secret = c.env.JWT_SECRET
+  if (!secret) throw new Error("JWT_SECRET is not configured")
+  
+  const jwtMiddleware = jwt({ secret, alg: 'HS256' })
+  return jwtMiddleware(c, next)
+})
+
+app.get('/api/health', (c) => c.json({ status: 'ok' }))
+
 app.post('/api/auth/switch-workspace', async (c) => {
   const db = drizzle(c.env.DB)
   const body = await c.req.json()
@@ -172,7 +205,8 @@ app.post('/api/auth/switch-workspace', async (c) => {
   const memberships = await db.select().from(schema.companyMemberships)
     .where(and(
       eq(schema.companyMemberships.userId, jwtPayload.id),
-      eq(schema.companyMemberships.companyId, companyId)
+      eq(schema.companyMemberships.companyId, companyId),
+      eq(schema.companyMemberships.status, 'ACTIVE')
     ))
 
   if (memberships.length === 0) {
@@ -186,19 +220,6 @@ app.post('/api/auth/switch-workspace', async (c) => {
   
   return c.json({ token, companyId })
 })
-
-app.use('/api/*', async (c, next) => {
-  if (c.req.path === '/api/auth/login' || c.req.path === '/api/auth/register' || c.req.path === '/api/health' || c.req.path.startsWith('/api/assets/public/')) {
-    return next()
-  }
-  const secret = c.env.JWT_SECRET
-  if (!secret) throw new Error("JWT_SECRET is not configured")
-  
-  const jwtMiddleware = jwt({ secret, alg: 'HS256' })
-  return jwtMiddleware(c, next)
-})
-
-app.get('/api/health', (c) => c.json({ status: 'ok' }))
 
 // --- ALL DATA (Para inicialización rápida) ---
 app.get('/api/all', async (c) => {
@@ -330,7 +351,11 @@ app.post('/api/packages', async (c) => {
     const data = parsed.data as any
     data.companyId = c.get('jwtPayload').companyId
     
-    await assertTenantResources(db, schema.partners, data.partnerIds, data.companyId, 'Proveedores')
+    if (data.partnerIds && data.partnerIds.length > 0) {
+      const partners = await db.select().from(schema.partners).where(and(inArray(schema.partners.id, data.partnerIds), eq(schema.partners.companyId, data.companyId)))
+      if (partners.length !== data.partnerIds.length) throw new Error('Algún proveedor no fue encontrado o no pertenece a la empresa.')
+      if (partners.some(p => !p.isActive)) throw new Error('No se pueden incluir proveedores archivados en un paquete.')
+    }
 
     if (!data.createdAt) data.createdAt = new Date().toISOString()
     await db.insert(schema.packages).values(data)
@@ -347,8 +372,10 @@ app.put('/api/packages/:id', async (c) => {
   const parsed = validators.packageUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
   
-  if (parsed.data.partnerIds) {
-    await assertTenantResources(db, schema.partners, parsed.data.partnerIds, companyId, 'Proveedores')
+  if (parsed.data.partnerIds && parsed.data.partnerIds.length > 0) {
+    const partners = await db.select().from(schema.partners).where(and(inArray(schema.partners.id, parsed.data.partnerIds), eq(schema.partners.companyId, companyId)))
+    if (partners.length !== parsed.data.partnerIds.length) return c.json({ error: 'Algún proveedor no fue encontrado o no pertenece a la empresa.' }, 400)
+    if (partners.some(p => !p.isActive)) return c.json({ error: 'No se pueden incluir proveedores archivados en un paquete.' }, 400)
   }
 
   const result = await db.update(schema.packages).set(parsed.data).where(and(eq(schema.packages.id, id), eq(schema.packages.companyId, companyId)))
@@ -375,11 +402,16 @@ app.post('/api/events', async (c) => {
     data.companyId = c.get('jwtPayload').companyId
     
     await assertTenantResource(db, schema.clients, data.clientId, data.companyId, 'Cliente')
+    
+    if (!data.createdAt) data.createdAt = new Date().toISOString()
+    
+    // We cannot validate acceptedBudgetId mapping to this event because the event doesn't exist yet, 
+    // and usually budgets are created after the event. 
+    // If they pass acceptedBudgetId on creation, we can still verify it belongs to the tenant.
     if (data.acceptedBudgetId) {
       await assertTenantResource(db, schema.budgets, data.acceptedBudgetId, data.companyId, 'Presupuesto')
     }
 
-    if (!data.createdAt) data.createdAt = new Date().toISOString()
     await db.insert(schema.events).values(data)
     return c.json({ success: true })
   } catch (err: any) {
@@ -398,7 +430,9 @@ app.put('/api/events/:id', async (c) => {
     await assertTenantResource(db, schema.clients, parsed.data.clientId, companyId, 'Cliente')
   }
   if (parsed.data.acceptedBudgetId) {
-    await assertTenantResource(db, schema.budgets, parsed.data.acceptedBudgetId, companyId, 'Presupuesto')
+    const budgets = await db.select().from(schema.budgets).where(and(eq(schema.budgets.id, parsed.data.acceptedBudgetId), eq(schema.budgets.companyId, companyId)))
+    if (budgets.length === 0) return c.json({ error: 'Presupuesto no encontrado.' }, 400)
+    if (budgets[0].eventId !== id) return c.json({ error: 'El presupuesto no pertenece a este evento.' }, 400)
   }
 
   const result = await db.update(schema.events).set(parsed.data).where(and(eq(schema.events.id, id), eq(schema.events.companyId, companyId)))
@@ -424,10 +458,14 @@ app.post('/api/budgets', async (c) => {
     const data = parsed.data as any
     data.companyId = c.get('jwtPayload').companyId
     
-    await assertTenantResource(db, schema.events, data.eventId, data.companyId, 'Evento')
+    const events = await db.select().from(schema.events).where(and(eq(schema.events.id, data.eventId), eq(schema.events.companyId, data.companyId)))
+    if (events.length === 0) throw new Error(`Evento no encontrado o no pertenece a la empresa actual.`)
+    if (events[0].clientId !== data.clientId) throw new Error(`El cliente del presupuesto debe coincidir con el cliente del evento.`)
+    
     await assertTenantResource(db, schema.clients, data.clientId, data.companyId, 'Cliente')
     if (data.packageId) {
-      await assertTenantResource(db, schema.packages, data.packageId, data.companyId, 'Paquete')
+      const pkgs = await db.select().from(schema.packages).where(and(eq(schema.packages.id, data.packageId), eq(schema.packages.companyId, data.companyId)))
+      if (pkgs.length === 0 || !pkgs[0].isActive) throw new Error(`Paquete no encontrado, no pertenece a la empresa, o está archivado.`)
     }
 
     if (!data.createdAt) data.createdAt = new Date().toISOString()
@@ -445,14 +483,23 @@ app.put('/api/budgets/:id', async (c) => {
   const parsed = validators.budgetUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
 
+  // Skip cross validation on partial updates for simplicity, except if they provide eventId
   if (parsed.data.eventId) {
-    await assertTenantResource(db, schema.events, parsed.data.eventId, companyId, 'Evento')
+    const events = await db.select().from(schema.events).where(and(eq(schema.events.id, parsed.data.eventId), eq(schema.events.companyId, companyId)))
+    if (events.length === 0) return c.json({ error: `Evento no encontrado o no pertenece a la empresa actual.` }, 400)
+    
+    // If they update clientId as well, we validate it. If not, we assume it matches the existing.
+    if (parsed.data.clientId && events[0].clientId !== parsed.data.clientId) {
+      return c.json({ error: `El cliente del presupuesto debe coincidir con el cliente del evento.` }, 400)
+    }
   }
+  
   if (parsed.data.clientId) {
     await assertTenantResource(db, schema.clients, parsed.data.clientId, companyId, 'Cliente')
   }
   if (parsed.data.packageId) {
-    await assertTenantResource(db, schema.packages, parsed.data.packageId, companyId, 'Paquete')
+    const pkgs = await db.select().from(schema.packages).where(and(eq(schema.packages.id, parsed.data.packageId), eq(schema.packages.companyId, companyId)))
+    if (pkgs.length === 0 || !pkgs[0].isActive) return c.json({ error: `Paquete no encontrado o archivado.` }, 400)
   }
 
   const result = await db.update(schema.budgets).set(parsed.data).where(and(eq(schema.budgets.id, id), eq(schema.budgets.companyId, companyId)))
@@ -548,6 +595,17 @@ app.put('/api/settings', async (c) => {
   const db = drizzle(c.env.DB)
   const jwtPayload = c.get('jwtPayload')
   const companyId = jwtPayload.companyId
+  
+  // RBAC: Check if user is ADMIN
+  const memberships = await db.select().from(schema.companyMemberships).where(and(
+    eq(schema.companyMemberships.userId, jwtPayload.id),
+    eq(schema.companyMemberships.companyId, companyId),
+    eq(schema.companyMemberships.status, 'ACTIVE')
+  ))
+  if (memberships.length === 0 || memberships[0].role !== 'ADMIN') {
+    return c.json({ error: 'Forbidden: Admin role required' }, 403)
+  }
+
   const body = await c.req.json()
   const parsed = validators.companyUpdateSchema.safeParse(body)
   if (!parsed.success) return c.json({ error: parsed.error }, 400)
@@ -562,6 +620,9 @@ app.post('/api/upload', async (c) => {
   try {
     const formData = await c.req.formData()
     const file = formData.get('file') as unknown as File
+    const jwtPayload = c.get('jwtPayload')
+    const companyId = jwtPayload.companyId
+
     if (!file) return c.json({ error: 'No file provided' }, 400)
     
     const allowedMimeTypes = ['image/png', 'image/jpeg', 'image/webp']
@@ -570,8 +631,10 @@ app.post('/api/upload', async (c) => {
     
     const ext = file.name.split('.').pop() || 'png'
     const isPublic = formData.get('isPublic') === 'true'
-    const prefix = isPublic ? 'public/' : 'private/'
-    const key = `${prefix}logo-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+    
+    const key = isPublic 
+      ? `public/${companyId}/branding/logo-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
+      : `private/${companyId}/documents/doc-${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`
     
     await c.env.ASSETS.put(key, await file.arrayBuffer(), {
       httpMetadata: { contentType: file.type }
@@ -585,6 +648,15 @@ app.post('/api/upload', async (c) => {
 
 app.get('/api/assets/*', async (c) => {
   const key = c.req.path.replace('/api/assets/', '')
+  
+  if (key.startsWith('private/')) {
+    // Check tenant isolation
+    const jwtPayload = c.get('jwtPayload')
+    if (!key.startsWith(`private/${jwtPayload.companyId}/`)) {
+      return new Response('Unauthorized', { status: 403 })
+    }
+  }
+
   const object = await c.env.ASSETS.get(key)
   if (!object) return new Response('Not Found', { status: 404 })
   

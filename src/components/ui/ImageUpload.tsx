@@ -8,9 +8,10 @@ interface ImageUploadProps {
   onChange: (url: string) => void
   uploadUrl: string
   token: string
+  isPublic?: boolean
 }
 
-export function ImageUpload({ label, description, value, onChange, uploadUrl, token }: ImageUploadProps) {
+export function ImageUpload({ label, description, value, onChange, uploadUrl, token, isPublic }: ImageUploadProps) {
   const [isDragging, setIsDragging] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
   const [error, setError] = useState('')
@@ -27,6 +28,9 @@ export function ImageUpload({ label, description, value, onChange, uploadUrl, to
     try {
       const formData = new FormData()
       formData.append('file', file)
+      if (isPublic) {
+        formData.append('isPublic', 'true')
+      }
 
       const res = await fetch(uploadUrl, {
         method: 'POST',

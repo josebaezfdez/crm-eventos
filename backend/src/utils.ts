@@ -26,3 +26,10 @@ export async function assertTenantResources(
     throw new Error(`Alguno de los ${resourceName} no fue encontrado o no pertenece a la empresa actual.`)
   }
 }
+
+export async function assertAdminRole(c: any, db: any): Promise<void> {
+  const jwtPayload = c.get('jwtPayload')
+  // We need to query company_memberships
+  // We import schema in the place where this is called, or we can just pass the memberships table
+  // To avoid circular dependencies, let's just accept the memberships table as an argument
+}

@@ -93,6 +93,7 @@ export default function SettingsPage() {
               onChange={(url) => setFormData(f => ({ ...f, lightLogoUrl: url }))} 
               uploadUrl={BASE_URL + '/api/upload'}
               token={token!}
+              isPublic={true}
             />
             <ImageUpload 
               label="Logo Modo Oscuro" 
@@ -101,6 +102,7 @@ export default function SettingsPage() {
               onChange={(url) => setFormData(f => ({ ...f, darkLogoUrl: url }))} 
               uploadUrl={BASE_URL + '/api/upload'}
               token={token!}
+              isPublic={true}
             />
           </div>
         </Card>

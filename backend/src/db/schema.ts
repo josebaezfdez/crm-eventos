@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { sqliteTable, text, integer, real, uniqueIndex, index } from 'drizzle-orm/sqlite-core';
 
 export const companies = sqliteTable('companies', {
   id: text('id').primaryKey(),
@@ -33,6 +33,12 @@ export const companyMemberships = sqliteTable('company_memberships', {
   invitedAt: text('invited_at'),
   acceptedAt: text('accepted_at'),
   createdAt: text('created_at').notNull(),
+}, (table) => {
+  return {
+    userCompanyUnique: uniqueIndex('company_memberships_user_company_unique').on(table.userId, table.companyId),
+    userStatusIdx: index('company_memberships_user_status_idx').on(table.userId, table.status),
+    companyStatusIdx: index('company_memberships_company_status_idx').on(table.companyId, table.status)
+  }
 });
 
 export const clients = sqliteTable('clients', {

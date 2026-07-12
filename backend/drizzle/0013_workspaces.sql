@@ -34,12 +34,11 @@ CREATE TABLE `users_new` (
 	`created_at` text NOT NULL
 );
 
-CREATE UNIQUE INDEX `users_email_unique` ON `users_new` (`email`);
-
 -- 4. Copiar datos a users_new
 INSERT INTO `users_new` (`id`, `email`, `password_hash`, `password_salt`, `name`, `created_at`)
 SELECT `id`, `email`, `password_hash`, `password_salt`, `name`, `created_at` FROM `users`;
 
--- 5. Intercambiar tablas
+-- 5. Intercambiar tablas y crear index
 DROP TABLE `users`;
 ALTER TABLE `users_new` RENAME TO `users`;
+CREATE UNIQUE INDEX `users_email_unique` ON `users` (`email`);
